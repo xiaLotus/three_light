@@ -1,0 +1,326 @@
+[
+  {
+    "TIME": "2026-01-26",
+    "MachineID": "OVEN_1區軌道手臂",
+    "IP": "172.21.45.221",
+    "Port": 502,
+    "DI_Map": {
+      "BLUE": 3,
+      "GREEN": 2,
+      "RED": 0,
+      "YELLOW": 1
+    },
+    "Logic": {
+      "GREEN_ACTIVE": 0,
+      "RED_ACTIVE": 1,
+      "YELLOW_ACTIVE": 1
+    },
+    "System": "K115F_3380_Oven1",
+    "Mechanism": "Tower_Light",
+    "ClassName": "ASEF3-3380-OVEN1",
+    "Plant": "ASEF3",
+    "Site": "3380",
+    "Place": "K11-5F",
+    "AlarmCode": {
+      "GREEN": "TL-OVEN1-G0001",
+      "RED": "TL-OVEN1-R0001"
+    },
+    "AlarmMessage": {
+      "GREEN": "[第1套烤箱] 三色燈 Run 綠燈啟動-OVEN_1區軌道手臂",
+      "RED": "[第1套烤箱] 三色燈 Alarm 紅燈警報-OVEN_1區軌道手臂"
+    },
+    "Flag": {
+      "GREEN": false,
+      "RED": true
+    },
+    "open_d99": "N"
+  },
+  {
+    "TIME": "2026-01-26",
+    "MachineID": "OVEN_2區軌道手臂",
+    "IP": "172.21.45.226",
+    "Port": 502,
+    "DI_Map": {
+      "BLUE": 3,
+      "GREEN": 2,
+      "RED": 0,
+      "YELLOW": 1
+    },
+    "Logic": {
+      "GREEN_ACTIVE": 0,
+      "RED_ACTIVE": 1,
+      "YELLOW_ACTIVE": 1
+    },
+    "System": "K115F_3380_Oven2",
+    "Mechanism": "Tower_Light",
+    "ClassName": "ASEF3-3380-OVEN2",
+    "Plant": "ASEF3",
+    "Site": "3380",
+    "Place": "K11-5F",
+    "AlarmCode": {
+      "GREEN": "TL-OVEN2-G0001",
+      "RED": "TL-OVEN2-R0001"
+    },
+    "AlarmMessage": {
+      "GREEN": "[第1套烤箱] 三色燈 Run 綠燈啟動-OVEN_2區軌道手臂",
+      "RED": "[第1套烤箱] 三色燈 Alarm 紅燈警報-OVEN_2區軌道手臂"
+    },
+    "Flag": {
+      "GREEN": false,
+      "RED": true
+    },
+    "open_d99": "N"
+  },
+  {
+    "TIME": "2026-01-26",
+    "MachineID": "第二套烤箱_Loader",
+    "IP": "172.21.45.227",
+    "Port": 502,
+    "DI_Map": {
+      "BLUE": 3,
+      "GREEN": 2,
+      "RED": 0,
+      "YELLOW": 1
+    },
+    "Logic": {
+      "GREEN_ACTIVE": 0,
+      "RED_ACTIVE": 1,
+      "YELLOW_ACTIVE": 1
+    },
+    "System": "K115F_3380_Oven2",
+    "Mechanism": "Tower_Light",
+    "ClassName": "ASEF3-3380-OVEN2",
+    "Plant": "ASEF3",
+    "Site": "3380",
+    "Place": "K11-5F",
+    "AlarmCode": {
+      "GREEN": "TL-OVEN2-G0002",
+      "RED": "TL-OVEN2-R0002"
+    },
+    "AlarmMessage": {
+      "GREEN": "[第2套烤箱] 三色燈 Run 綠燈啟動-第二套烤箱_Loader",
+      "RED": "[第2套烤箱] 三色燈 Alarm 紅燈警報-第二套烤箱_Loader"
+    },
+    "Flag": {
+      "GREEN": true,
+      "RED": false
+    },
+    "open_d99": "N"
+  },
+  {
+    "TIME": "2026-02-05",
+    "MachineID": "第一套烤箱_Loader",
+    "IP": "172.21.45.222",
+    "Port": 502,
+    "DI_Map": {
+      "BLUE": 3,
+      "GREEN": 2,
+      "RED": 0,
+      "YELLOW": 1
+    },
+    "Logic": {
+      "GREEN_ACTIVE": 0,
+      "RED_ACTIVE": 1,
+      "YELLOW_ACTIVE": 1
+    },
+    "System": "K115F_3380_Oven1",
+    "Mechanism": "Tower_Light",
+    "ClassName": "ASEF3-3380-OVEN1",
+    "Plant": "ASEF3",
+    "Site": "3380",
+    "Place": "K11-5F",
+    "AlarmCode": {
+      "GREEN": "TL-OVEN1-G0002",
+      "RED": "TL-OVEN1-R0002"
+    },
+    "AlarmMessage": {
+      "GREEN": "[第1套烤箱] 三色燈 Run 綠燈啟動-第1套烤箱_Loader",
+      "RED": "[第1套烤箱] 三色燈 Alarm 紅燈警報-第1套烤箱_Loader"
+    },
+    "Flag": {
+      "GREEN": true,
+      "RED": false
+    },
+    "open_d99": "N"
+  },
+  {
+    "TIME": "2026-01-26",
+    "MachineID": "DryRoom_A區LD",
+    "IP": "172.21.45.223",
+    "Port": 502,
+    "DI_Map": {
+      "BLUE": 3,
+      "GREEN": 2,
+      "RED": 0,
+      "YELLOW": 1
+    },
+    "Logic": {
+      "GREEN_ACTIVE": 1,
+      "RED_ACTIVE": 1,
+      "YELLOW_ACTIVE": 1
+    },
+    "System": "K115F_Dryroom",
+    "Mechanism": "Tower_Light",
+    "ClassName": "ASEF3-3390-5FDRA",
+    "Plant": "ASEF3",
+    "Site": "3390",
+    "Place": "K11-5F",
+    "AlarmCode": {
+      "GREEN": "TL-DRYROOM-A-G001",
+      "RED": "TL-DRYROOM-A-R001"
+    },
+    "AlarmMessage": {
+      "GREEN": "[Dryroom-A] 三色燈 Run 綠燈啟動-Dryroom_A區LD",
+      "RED": "[Dryroom-A] 三色燈 Alarm 紅燈警報-Dryroom_A區LD"
+    },
+    "Flag": {
+      "GREEN": true,
+      "RED": false
+    },
+    "open_d99": "N"
+  },
+  {
+    "TIME": "2026-01-26",
+    "MachineID": "DryRoom_B區LD",
+    "IP": "172.21.45.228",
+    "Port": 502,
+    "DI_Map": {
+      "BLUE": 3,
+      "GREEN": 2,
+      "RED": 0,
+      "YELLOW": 1
+    },
+    "Logic": {
+      "GREEN_ACTIVE": 1,
+      "RED_ACTIVE": 1,
+      "YELLOW_ACTIVE": 1
+    },
+    "System": "K115F_Dryroom",
+    "Mechanism": "Tower_Light",
+    "ClassName": "ASEF3-3390-5FDRB",
+    "Plant": "ASEF3",
+    "Site": "3390",
+    "Place": "K11-5F",
+    "AlarmCode": {
+      "GREEN": "TL-DRYROOM-B-G001",
+      "RED": "TL-DRYROOM-B-R001"
+    },
+    "AlarmMessage": {
+      "GREEN": "[Dryroom-B] 三色燈 Run 綠燈啟動-Dryroom_B區LD",
+      "RED": "[Dryroom-B] 三色燈 Alarm 紅燈警報-Dryroom_B區LD"
+    },
+    "Flag": {
+      "GREEN": true,
+      "RED": false
+    },
+    "open_d99": "N"
+  },
+  {
+    "TIME": "2026-01-26",
+    "MachineID": "Dryroom出料流道",
+    "IP": "172.21.45.225",
+    "Port": 502,
+    "DI_Map": {
+      "BLUE": 3,
+      "GREEN": 2,
+      "RED": 0,
+      "YELLOW": 1
+    },
+    "Logic": {
+      "GREEN_ACTIVE": 1,
+      "RED_ACTIVE": 1,
+      "YELLOW_ACTIVE": 1
+    },
+    "System": "K115F_Dryroom",
+    "Mechanism": "Tower_Light",
+    "ClassName": "ASEF3-3390-5FDR出",
+    "Plant": "ASEF3",
+    "Site": "3390",
+    "Place": "K11-5F",
+    "AlarmCode": {
+      "GREEN": "TL-DRYROOM-UD-G001",
+      "RED": "TL-DRYROOM-UD-R001"
+    },
+    "AlarmMessage": {
+      "GREEN": "[Dryroom] 三色燈 Run 綠燈啟動-Dryroom_出料流道",
+      "RED": "[Dryroom] 三色燈 Alarm 紅燈警報-Dryroom_出料流道"
+    },
+    "Flag": {
+      "GREEN": true,
+      "RED": false
+    },
+    "open_d99": "N"
+  },
+  {
+    "TIME": "2026-01-26",
+    "MachineID": "DryRoom_A區WIP",
+    "IP": "172.21.45.224",
+    "Port": 502,
+    "DI_Map": {
+      "BLUE": 3,
+      "GREEN": 2,
+      "RED": 0,
+      "YELLOW": 1
+    },
+    "Logic": {
+      "GREEN_ACTIVE": 1,
+      "RED_ACTIVE": 1,
+      "YELLOW_ACTIVE": 1
+    },
+    "System": "K115F_Dryroom",
+    "Mechanism": "Tower_Light",
+    "ClassName": "ASEF3-3390-5FDRA",
+    "Plant": "ASEF3",
+    "Site": "3390",
+    "Place": "K11-5F",
+    "AlarmCode": {
+      "GREEN": "TL-DRYROOM-A-G002",
+      "RED": "TL-DRYROOM-A-R002"
+    },
+    "AlarmMessage": {
+      "GREEN": "[Dryroom-A] 三色燈 Run 綠燈啟動-Dryroom_A區WIP",
+      "RED": "[Dryroom-A] 三色燈 Alarm 紅燈警報-Dryroom_A區WIP"
+    },
+    "Flag": {
+      "GREEN": true,
+      "RED": false
+    },
+    "open_d99": "N"
+  },
+  {
+    "TIME": "2026-01-26",
+    "MachineID": "DryRoom_B區WIP",
+    "IP": "172.21.45.229",
+    "Port": 502,
+    "DI_Map": {
+      "BLUE": 3,
+      "GREEN": 2,
+      "RED": 0,
+      "YELLOW": 1
+    },
+    "Logic": {
+      "GREEN_ACTIVE": 1,
+      "RED_ACTIVE": 1,
+      "YELLOW_ACTIVE": 1
+    },
+    "System": "K115F_Dryroom",
+    "Mechanism": "Tower_Light",
+    "ClassName": "ASEF3-3390-5FDRB",
+    "Plant": "ASEF3",
+    "Site": "3390",
+    "Place": "K11-5F",
+    "AlarmCode": {
+      "GREEN": "TL-DRYROOM-B-G002",
+      "RED": "TL-DRYROOM-B-R002"
+    },
+    "AlarmMessage": {
+      "GREEN": "[Dryroom-B] 三色燈 Run 綠燈啟動-Dryroom_B區WIP",
+      "RED": "[Dryroom-B] 三色燈 Alarm 紅燈警報-Dryroom_B區WIP"
+    },
+    "Flag": {
+      "GREEN": true,
+      "RED": false
+    },
+    "open_d99": "N"
+  }
+]

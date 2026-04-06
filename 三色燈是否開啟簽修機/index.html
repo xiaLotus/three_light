@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <title>簽修機狀態總攬</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+
+    <style>
+        *, *::before, *::after { box-sizing: border-box; }
+
+        html, body {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background: #e2e8f0;
+        }
+
+        #app {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            padding: 12px;
+            gap: 0;
+        }
+
+        /* ── 標題列 ── */
+        .top-bar {
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            padding: 8px 0 10px;
+        }
+
+        .page-title {
+            font-size: 18px;
+            font-weight: bold;
+            letter-spacing: 3px;
+            color: #0f172a;
+        }
+
+        /* 編輯按鈕放右側 */
+        .btn-area {
+            position: absolute;
+            right: 0;
+            display: flex;
+            gap: 6px;
+        }
+
+        .btn {
+            padding: 5px 14px;
+            border-radius: 5px;
+            font-size: 12px;
+            font-weight: bold;
+            cursor: pointer;
+            border: none;
+            transition: opacity .15s;
+        }
+        .btn:hover { opacity: .85; }
+
+        .btn-edit   { background: #3b82f6; color: white; }
+        .btn-save   { background: #16a34a; color: white; }
+        .btn-cancel { background: #94a3b8; color: white; }
+
+        /* ── 表格容器 ── */
+        .table-wrap {
+            flex: 1;
+            min-height: 0;
+            display: flex;
+            flex-direction: column;
+            border-radius: 6px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.15);
+            overflow: hidden;
+        }
+
+        .thead-wrap {
+            flex-shrink: 0;
+            overflow: hidden;
+            background: #0f172a;
+        }
+
+        .tbody-wrap {
+            flex: 1;
+            min-height: 0;
+            overflow-y: scroll;
+            overflow-x: hidden;
+            background: white;
+        }
+
+        table {
+            width: 100%;
+            table-layout: fixed;
+            border-collapse: collapse;
+            font-size: 11px;
+        }
+
+        .thead-wrap th {
+            background-color: #0f172a;
+            color: white;
+            padding: 12px 8px;
+            border: 1px solid #475569;
+            text-align: center;
+            white-space: normal;
+            word-break: break-word;
+            line-height: 1.4;
+        }
+
+        .thead-wrap tr:nth-child(2) th {
+            background-color: #1e293b;
+        }
+
+        td {
+            padding: 6px 6px;
+            border: 1px solid #e2e8f0;
+            color: #334155;
+            vertical-align: middle;
+            white-space: normal;
+            word-break: break-word;
+            background: white;
+        }
+
+        tr:hover td { background: #f8fafc; }
+
+        /* 編輯模式：textarea 樣式 */
+        .edit-input {
+            width: 100%;
+            padding: 3px 5px;
+            font-size: 11px;
+            border: 1px solid #93c5fd;
+            border-radius: 3px;
+            background: #eff6ff;
+            color: #1e40af;
+            outline: none;
+            box-sizing: border-box;
+            resize: vertical;
+            min-height: 28px;
+            line-height: 1.4;
+            font-family: inherit;
+            overflow: hidden;
+        }
+        .edit-input:focus {
+            border-color: #3b82f6;
+            background: #dbeafe;
+            overflow: auto;
+        }
+
+        .can-wrap {
+            white-space: normal !important;
+            word-break: break-all !important;
+        }
+
+        /* 編輯中的列高亮 */
+        tr.editing td {
+            background: #f0f9ff !important;
+        }
+    </style>
+</head>
+
+<body>
+<div id="app">
+
+    <!-- 標題 + 按鈕 -->
+    <div class="top-bar">
+        <span class="page-title">簽修機狀態總攬</span>
+        <div class="btn-area">
+            <!-- 一般模式 -->
+            <button v-if="!editMode" class="btn btn-edit" @click="startEdit">✏️ 編輯</button>
+            <!-- 編輯模式 -->
+            <template v-else>
+                <button class="btn btn-save"   @click="saveAll">💾 儲存</button>
+                <button class="btn btn-cancel" @click="cancelEdit">✕ 取消</button>
+            </template>
+        </div>
+    </div>
+
+    <!-- 表格 -->
+    <div class="table-wrap">
+
+        <div class="thead-wrap" ref="theadWrap">
+            <table>
+                <colgroup>
+                    <col style="width:8%">
+                    <col style="width:9%">
+                    <col style="width:8%">
+                    <col style="width:6%">
+                    <col style="width:6%">
+                    <col style="width:7%">
+                    <col style="width:3%">
+                    <col style="width:3%">
+                    <col style="width:4%">
+                    <col style="width:5%">
+                    <col style="width:5%">
+                    <col style="width:16%">
+                    <col style="width:16%">
+                    <col style="width:4%">
+                </colgroup>
+                <thead>
+                    <tr>
+                        <th rowspan="2">TIME</th>
+                        <th rowspan="2">MachineID</th>
+                        <th rowspan="2">IP</th>
+                        <th rowspan="2">System</th>
+                        <th rowspan="2">Mechanism</th>
+                        <th rowspan="2">ClassName</th>
+                        <th rowspan="2">Plant</th>
+                        <th rowspan="2">Site</th>
+                        <th rowspan="2">Place</th>
+                        <th colspan="2">AlarmCode</th>
+                        <th colspan="2">AlarmMessage</th>
+                        <th rowspan="2">簽修機</th>
+                    </tr>
+                    <tr>
+                        <th>RED</th><th>GREEN</th>
+                        <th>RED</th><th>GREEN</th>
+                    </tr>
+                </thead>
+            </table>
+        </div>
+
+        <div class="tbody-wrap" ref="tbodyWrap">
+            <table>
+                <colgroup>
+                    <col style="width:8%">
+                    <col style="width:9%">
+                    <col style="width:8%">
+                    <col style="width:6%">
+                    <col style="width:6%">
+                    <col style="width:7%">
+                    <col style="width:3%">
+                    <col style="width:3%">
+                    <col style="width:4%">
+                    <col style="width:5%">
+                    <col style="width:5%">
+                    <col style="width:16%">
+                    <col style="width:16%">
+                    <col style="width:4%">
+                </colgroup>
+                <tbody>
+                    <tr v-for="m in editMode ? drafts : machines"
+                        :key="(m.IP || '') + (m.MachineID || '')"
+                        :class="{ editing: editMode }">
+
+                        <!-- TIME（唯讀） -->
+                        <td>{{ m.TIME }}</td>
+
+                        <!-- MachineID（唯讀，識別用） -->
+                        <td class="font-bold">{{ m.MachineID }}</td>
+
+                        <!-- IP（唯讀，識別用） -->
+                        <td class="text-blue-600">{{ m.IP }}</td>
+
+                        <!-- 可編輯欄位 -->
+                        <td>
+                            <template v-if="editMode">
+                                <textarea class="edit-input" v-model="m.System" @input="autoResize" rows="1"></textarea>
+                            </template>
+                            <template v-else>{{ m.System }}</template>
+                        </td>
+                        <td>
+                            <template v-if="editMode">
+                                <textarea class="edit-input" v-model="m.Mechanism" @input="autoResize" rows="1"></textarea>
+                            </template>
+                            <template v-else>{{ m.Mechanism }}</template>
+                        </td>
+                        <td>
+                            <template v-if="editMode">
+                                <textarea class="edit-input" v-model="m.ClassName" @input="autoResize" rows="1"></textarea>
+                            </template>
+                            <template v-else>{{ m.ClassName }}</template>
+                        </td>
+                        <td>
+                            <template v-if="editMode">
+                                <textarea class="edit-input" v-model="m.Plant" @input="autoResize" rows="1"></textarea>
+                            </template>
+                            <template v-else>{{ m.Plant }}</template>
+                        </td>
+                        <td>
+                            <template v-if="editMode">
+                                <textarea class="edit-input" v-model="m.Site" @input="autoResize" rows="1"></textarea>
+                            </template>
+                            <template v-else>{{ m.Site }}</template>
+                        </td>
+                        <td>
+                            <template v-if="editMode">
+                                <textarea class="edit-input" v-model="m.Place" @input="autoResize" rows="1"></textarea>
+                            </template>
+                            <template v-else>{{ m.Place }}</template>
+                        </td>
+
+                        <!-- AlarmCode RED -->
+                        <td class="text-red-600">
+                            <template v-if="editMode">
+                                <textarea class="edit-input" v-model="m.AlarmCode.RED" @input="autoResize" rows="1" style="color:#dc2626"></textarea>
+                            </template>
+                            <template v-else>{{ m.AlarmCode?.RED }}</template>
+                        </td>
+
+                        <!-- AlarmCode GREEN -->
+                        <td class="text-green-600">
+                            <template v-if="editMode">
+                                <textarea class="edit-input" v-model="m.AlarmCode.GREEN" @input="autoResize" rows="1" style="color:#16a34a"></textarea>
+                            </template>
+                            <template v-else>{{ m.AlarmCode?.GREEN }}</template>
+                        </td>
+
+                        <!-- AlarmMessage RED -->
+                        <td class="can-wrap text-red-600">
+                            <template v-if="editMode">
+                                <textarea class="edit-input" v-model="m.AlarmMessage.RED" @input="autoResize" rows="1" style="color:#dc2626"></textarea>
+                            </template>
+                            <template v-else>{{ m.AlarmMessage?.RED }}</template>
+                        </td>
+
+                        <!-- AlarmMessage GREEN -->
+                        <td class="can-wrap text-green-600">
+                            <template v-if="editMode">
+                                <textarea class="edit-input" v-model="m.AlarmMessage.GREEN" @input="autoResize" rows="1" style="color:#16a34a"></textarea>
+                            </template>
+                            <template v-else>{{ m.AlarmMessage?.GREEN }}</template>
+                        </td>
+
+                        <!-- 簽修機（永遠可點擊） -->
+                        <td class="text-center cursor-pointer" @click="toggleStatus(m)">
+                            <span :class="m.open_d99 === 'Y' ? 'text-indigo-600 font-bold' : 'text-slate-300'">
+                                {{ m.open_d99 }}
+                            </span>
+                        </td>
+
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+    </div>
+</div>
+
+<script>
+const { createApp, ref, onMounted } = Vue;
+
+createApp({
+    setup() {
+        const machines  = ref([]);
+        const drafts    = ref([]);   // 編輯中的暫存副本
+        const editMode  = ref(false);
+        const theadWrap = ref(null);
+        const tbodyWrap = ref(null);
+
+        /* scrollbar 補償 */
+        const compensateScrollbar = () => {
+            if (!tbodyWrap.value || !theadWrap.value) return;
+            const sbWidth = tbodyWrap.value.offsetWidth - tbodyWrap.value.clientWidth;
+            theadWrap.value.style.paddingRight = sbWidth + 'px';
+        };
+
+        /* 深複製一筆 machine */
+        const deepCopy = arr => JSON.parse(JSON.stringify(arr));
+
+        const fetchData = async () => {
+            if (editMode.value) return;   // 編輯中不自動刷新
+            const res = await fetch('http://127.0.0.1:5000/api/machines');
+            machines.value = await res.json();
+        };
+
+        /* 自動撐高 textarea */
+        const autoResize = (e) => {
+            const el = e.target;
+            el.style.height = 'auto';
+            el.style.height = el.scrollHeight + 'px';
+        };
+
+        const initTextareaHeights = () => {
+            // 等 Vue 渲染完後再調整高度
+            setTimeout(() => {
+                document.querySelectorAll('.edit-input').forEach(el => {
+                    el.style.height = 'auto';
+                    el.style.height = el.scrollHeight + 'px';
+                });
+            }, 50);
+        };
+
+        /* 進入編輯模式 */
+        const startEdit = () => {
+            drafts.value = deepCopy(machines.value);
+            editMode.value = true;
+            initTextareaHeights();
+        };
+
+        /* 儲存 */
+        const saveAll = async () => {
+            try {
+                // 逐筆送出有異動的列
+                const promises = drafts.value.map(draft => {
+                    return fetch('http://127.0.0.1:5000/api/update_machine', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(draft)
+                    });
+                });
+                await Promise.all(promises);
+                machines.value = deepCopy(drafts.value);
+                editMode.value = false;
+            } catch (e) {
+                alert('儲存失敗：' + e.message);
+            }
+        };
+
+        /* 取消 */
+        const cancelEdit = () => {
+            drafts.value = [];
+            editMode.value = false;
+        };
+
+        /* 切換簽修機狀態（編輯模式下也可用） */
+        const toggleStatus = async (m) => {
+            const oldStatus = m.open_d99;
+            const newStatus = oldStatus === 'Y' ? 'N' : 'Y';
+            m.open_d99 = newStatus;
+            try {
+                await fetch('http://127.0.0.1:5000/api/update_status', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        MachineID: m.MachineID,
+                        IP: m.IP,
+                        Status: newStatus
+                    })
+                });
+            } catch {
+                m.open_d99 = oldStatus;
+                alert('更新失敗');
+            }
+        };
+
+        onMounted(() => {
+            fetchData();
+            setInterval(fetchData, 5000);
+            requestAnimationFrame(compensateScrollbar);
+            window.addEventListener('resize', compensateScrollbar);
+        });
+
+        return {
+            machines, drafts, editMode,
+            theadWrap, tbodyWrap,
+            startEdit, saveAll, cancelEdit, toggleStatus, autoResize
+        };
+    }
+}).mount('#app');
+</script>
+
+</body>
+</html>
