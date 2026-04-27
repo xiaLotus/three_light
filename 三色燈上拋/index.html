@@ -1,0 +1,710 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>設備狀態時序圖</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/vue@3.3.4/dist/vue.global.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        html, body {
+            height: 100%;
+            overflow: hidden;
+            background: #000000;
+        }
+
+        /* 初始隱藏主內容，避免閃爍 */
+        #app {
+            opacity: 0;
+            transition: opacity 0.5s ease-in;
+        }
+
+        #app.show {
+            opacity: 1;
+        }
+        
+        .sidebar {
+            width: 320px;
+            height: 100vh;
+            position: fixed;
+            left: 0;
+            top: 0;
+            background: linear-gradient(180deg, #1a1a1a 0%, #0a0a0a 100%);
+            color: white;
+            overflow-y: auto;
+            box-shadow: 4px 0 20px rgba(0, 0, 0, 0.5);
+            z-index: 100;
+        }
+        
+        .main-content {
+            margin-left: 320px;
+            height: 100vh;
+            overflow-y: auto;
+            background: #000000;
+        }
+        
+        .building-card {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 12px 16px;
+            margin-bottom: 12px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .building-card:hover {
+            background: rgba(255, 255, 255, 0.1);
+            transform: translateX(4px);
+            border-color: rgba(255, 255, 255, 0.2);
+        }
+        
+        .building-card.active {
+            background: rgba(59, 130, 246, 0.2);
+            border-color: rgba(59, 130, 246, 0.5);
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+        }
+        
+        .floor-badge {
+            display: inline-block;
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 6px;
+            padding: 4px 10px;
+            margin: 4px 4px 4px 0;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        
+        .floor-badge:hover {
+            background: rgba(255, 255, 255, 0.15);
+            border-color: rgba(255, 255, 255, 0.3);
+        }
+        
+        .floor-badge.active {
+            background: rgba(59, 130, 246, 0.3);
+            color: #60a5fa;
+            border-color: rgba(59, 130, 246, 0.6);
+            font-weight: 600;
+        }
+
+        .process-badge {
+            display: inline-block;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            padding: 6px 14px;
+            margin: 4px 4px 4px 0;
+            font-size: 0.9rem;
+            font-weight: 600;
+            letter-spacing: 1px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            color: rgba(255, 255, 255, 0.75);
+        }
+
+        .process-badge:hover {
+            background: rgba(168, 85, 247, 0.2);
+            border-color: rgba(168, 85, 247, 0.4);
+            color: #c4b5fd;
+        }
+
+        .process-badge.active {
+            background: rgba(168, 85, 247, 0.3);
+            color: #c4b5fd;
+            border-color: rgba(168, 85, 247, 0.6);
+            box-shadow: 0 0 8px rgba(168, 85, 247, 0.3);
+        }
+        
+        .time-range-btn {
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 8px;
+            padding: 10px 16px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            color: white;
+            font-weight: 500;
+        }
+        
+        .time-range-btn:hover {
+            background: rgba(255, 255, 255, 0.15);
+            border-color: rgba(255, 255, 255, 0.3);
+        }
+        
+        .time-range-btn.active {
+            background: rgba(59, 130, 246, 0.3);
+            color: #60a5fa;
+            border-color: rgba(59, 130, 246, 0.6);
+        }
+        
+        .sidebar-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            text-align: center;
+            padding: 24px 20px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            background: rgba(0, 0, 0, 0.3);
+        }
+        
+        .sidebar-section {
+            padding: 20px;
+        }
+        
+        .custom-input {
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 8px;
+            padding: 8px 12px;
+            color: white;
+            width: 100%;
+            margin-bottom: 8px;
+        }
+        
+        .custom-input::placeholder {
+            color: rgba(255, 255, 255, 0.4);
+        }
+        
+        .custom-input:focus {
+            outline: none;
+            background: rgba(255, 255, 255, 0.12);
+            border-color: rgba(59, 130, 246, 0.6);
+        }
+        
+        .action-btn {
+            background: rgba(59, 130, 246, 0.9);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 10px 20px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            width: 100%;
+            margin-bottom: 8px;
+        }
+        
+        .action-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+            background: rgba(59, 130, 246, 1);
+        }
+        
+        .action-btn.secondary {
+            background: rgba(255, 255, 255, 0.08);
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+        }
+        
+        .action-btn.secondary:hover {
+            background: rgba(255, 255, 255, 0.15);
+            box-shadow: 0 4px 12px rgba(255, 255, 255, 0.1);
+        }
+        
+        /* 滾動條樣式 */
+        .sidebar::-webkit-scrollbar,
+        .main-content::-webkit-scrollbar {
+            width: 8px;
+        }
+        
+        .sidebar::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.05);
+        }
+        
+        .sidebar::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 4px;
+        }
+        
+        .sidebar::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .main-content::-webkit-scrollbar-track {
+            background: #1a1a1a;
+        }
+        
+        .main-content::-webkit-scrollbar-thumb {
+            background: #333;
+            border-radius: 4px;
+        }
+        
+        .main-content::-webkit-scrollbar-thumb:hover {
+            background: #444;
+        }
+
+        /* Loading 動畫 */
+        .loading-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: linear-gradient(135deg, #000000 0%, #1a1a1a 100%);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+            transition: opacity 0.5s ease-out;
+        }
+
+        .loading-screen.fade-out {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .loader-container {
+            position: relative;
+            width: 150px;
+            height: 150px;
+        }
+
+        .loader-ring {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            border: 4px solid transparent;
+            border-radius: 50%;
+            animation: rotate 2s linear infinite;
+        }
+
+        .loader-ring:nth-child(1) {
+            border-top-color: #3b82f6;
+            animation-duration: 2s;
+        }
+
+        .loader-ring:nth-child(2) {
+            border-right-color: #60a5fa;
+            animation-duration: 1.5s;
+            animation-direction: reverse;
+        }
+
+        .loader-ring:nth-child(3) {
+            border-bottom-color: #93c5fd;
+            animation-duration: 2.5s;
+        }
+
+        @keyframes rotate {
+            0% {
+                transform: rotate(0deg);
+            }
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        .loader-text {
+            margin-top: 30px;
+            color: white;
+            font-size: 1.2rem;
+            font-weight: 600;
+            letter-spacing: 2px;
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                opacity: 1;
+            }
+            50% {
+                opacity: 0.5;
+            }
+        }
+
+        .loader-dots {
+            display: inline-block;
+            width: 60px;
+            text-align: left;
+        }
+
+        .loader-dots::after {
+            content: '';
+            animation: dots 1.5s steps(4, end) infinite;
+        }
+
+        @keyframes dots {
+            0%, 20% {
+                content: '';
+            }
+            40% {
+                content: '.';
+            }
+            60% {
+                content: '..';
+            }
+            80%, 100% {
+                content: '...';
+            }
+        }
+
+        .loader-icon {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 3rem;
+            animation: iconPulse 2s ease-in-out infinite;
+        }
+
+        @keyframes iconPulse {
+            0%, 100% {
+                transform: translate(-50%, -50%) scale(1);
+                opacity: 1;
+            }
+            50% {
+                transform: translate(-50%, -50%) scale(1.1);
+                opacity: 0.8;
+            }
+        }
+
+        /* 中間載入動畫 */
+        .center-loading {
+            position: fixed;
+            left: 320px;
+            top: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(5px);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 999;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+        }
+
+        .center-loading.active {
+            opacity: 1;
+            pointer-events: all;
+        }
+
+        .center-spinner {
+            width: 80px;
+            height: 80px;
+            position: relative;
+        }
+
+        .center-spinner-ring {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            border: 3px solid transparent;
+            border-radius: 50%;
+            border-top-color: #3b82f6;
+            animation: spin 1s linear infinite;
+        }
+
+        .center-spinner-ring:nth-child(2) {
+            border-top-color: #60a5fa;
+            animation-duration: 0.8s;
+            animation-direction: reverse;
+            width: 70%;
+            height: 70%;
+            top: 15%;
+            left: 15%;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .center-loading-text {
+            margin-top: 20px;
+            color: white;
+            font-size: 1.1rem;
+            font-weight: 600;
+            letter-spacing: 1px;
+        }
+
+        .center-loading-dots::after {
+            content: '';
+            animation: dots 1.5s steps(4, end) infinite;
+        }
+    </style>
+</head>
+<body>
+    <!-- Loading 動畫 -->
+    <div id="loadingScreen" class="loading-screen">
+        <div class="loader-container">
+            <div class="loader-ring"></div>
+            <div class="loader-ring"></div>
+            <div class="loader-ring"></div>
+            <div class="loader-icon">👍</div>
+        </div>
+        <div class="loader-text text-center">
+            載入中<span class="loader-dots"></span>
+        </div>
+    </div>
+
+    <!-- 中間載入動畫 -->
+    <div id="centerLoading" class="center-loading">
+        <div class="center-spinner">
+            <div class="center-spinner-ring"></div>
+            <div class="center-spinner-ring"></div>
+        </div>
+        <div class="loader-text w-full text-center">
+            載入中<span class="loader-dots"></span>
+        </div>
+    </div>
+
+    <div id="app">
+        <!-- 左側固定區域 -->
+        <div class="sidebar">
+            <!-- 標題 -->
+            <div class="sidebar-title">
+                設備狀態時序圖
+            </div>
+            
+            <!-- 載入狀態 -->
+            <div v-if="loading" class="sidebar-section">
+                <div class="text-center">
+                    <div class="inline-block animate-spin rounded-full h-10 w-10 border-b-2 border-white"></div>
+                    <p class="mt-3 text-white/80">載入中...</p>
+                </div>
+            </div>
+            
+            <!-- 錯誤訊息 -->
+            <div v-if="error" class="sidebar-section">
+                <div class="bg-red-500/20 border border-red-300 rounded-lg p-3 text-white text-sm">
+                    {{ error }}
+                </div>
+            </div>
+            
+            <div v-if="!loading && !error">
+                <!-- Building 選擇區 -->
+                <div class="sidebar-section">
+                    <div class="space-y-2">
+                        <div 
+                            v-for="building in availableBuildings" 
+                            :key="building"
+                            @click="selectBuilding(building)"
+                            class="building-card"
+                            :class="{ active: selectedBuilding === building }">
+                            <div class="flex items-center justify-between">
+                                <span class="font-semibold">{{ building }}</span>
+                                <svg v-if="selectedBuilding === building" class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+                                </svg>
+                            </div>
+                            
+                            <!-- Floor 選擇 -->
+                            <div v-if="selectedBuilding === building && buildingFloors[building]" class="mt-3 pt-3 border-t border-white/20">
+                                <div class="text-xs mb-2 opacity-60 uppercase tracking-widest">Floor</div>
+                                <div class="flex flex-wrap">
+                                    <span 
+                                        v-for="floor in buildingFloors[building]" 
+                                        :key="floor"
+                                        @click.stop="selectFloor(floor)"
+                                        class="floor-badge"
+                                        :class="{ active: selectedFloor === floor }">
+                                        {{ floor }}
+                                    </span>
+                                </div>
+                            </div>
+
+                            <!-- Process Code 選擇 -->
+                            <div v-if="selectedBuilding === building && selectedFloor && availableProcessCodes.length > 0" class="mt-3 pt-3 border-t border-white/10">
+                                <div class="text-xs mb-2 opacity-60 uppercase tracking-widest">製程代號</div>
+                                <div class="flex flex-wrap">
+                                    <span
+                                        v-for="code in availableProcessCodes"
+                                        :key="code"
+                                        @click.stop="selectProcessCode(code)"
+                                        class="process-badge"
+                                        :class="{ active: selectedProcessCode === code }">
+                                        {{ code }}
+                                    </span>
+                                </div>
+                                <div v-if="selectedProcessCode" class="mt-2 text-xs opacity-50">
+                                    顯示 {{ filteredTimelineData.length }} 筆 / 共 {{ timelineData.length }} 筆
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 時間範圍選擇 -->
+                <div class="sidebar-section">
+                    <!-- 快速選擇 - 2x2 佈局 -->
+                    <div class="mb-4">
+                        <div class="text-sm mb-2 opacity-80">快速選擇：</div>
+                        <div class="grid grid-cols-2 gap-3">
+                            <button @click="selectQuickRange(1)" class="time-range-btn w-full" :class="{ active: quickRange === 1 }">
+                                24小時
+                            </button>
+                            <button @click="selectQuickRange(7)" class="time-range-btn w-full" :class="{ active: quickRange === 7 }">
+                                7天
+                            </button>
+                            <button @click="selectQuickRange(30)" class="time-range-btn w-full" :class="{ active: quickRange === 30 }">
+                                30天
+                            </button>
+                            <button @click="selectQuickRange(null)" class="time-range-btn w-full" :class="{ active: quickRange === null }">
+                                全部
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- 自訂日期 -->
+                    <div class="border-t border-white/20 pt-4">
+                        <div class="text-sm mb-2 opacity-80">自訂日期範圍：</div>
+                        <input type="date" v-model="customStartDate" class="custom-input" placeholder="開始日期">
+                        <input type="date" v-model="customEndDate" class="custom-input" placeholder="結束日期">
+                        <button @click="applyCustomRange" class="action-btn">
+                            🔍 查詢
+                        </button>
+                        <button @click="resetFilter" class="action-btn secondary">
+                            🔄 重置
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- 圖例 -->
+                <div class="sidebar-section">
+                    <div class="space-y-2">
+                        <div class="flex items-center gap-3 p-2 rounded-lg bg-white/10">
+                            <div class="w-6 h-6 bg-red-500 rounded"></div>
+                            <span class="font-medium">ALARM (警報)</span>
+                        </div>
+                        <div class="flex items-center gap-3 p-2 rounded-lg bg-white/10">
+                            <div class="w-6 h-6 bg-green-500 rounded"></div>
+                            <span class="font-medium">BUSY (忙碌)</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 右側主要內容區域（可滾動） -->
+        <div class="main-content">
+            <div class="max-w-7xl mx-auto p-6">
+                <!-- 圖表區域 -->
+                <div v-if="!loading && !error" class="bg-white rounded-2xl shadow-lg p-6 mb-6">
+                    <h2 class="text-2xl font-bold text-gray-800 mb-4 flex items-center gap-2">
+                        <svg class="w-7 h-7 text-indigo-600" fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z"/>
+                        </svg>
+                        時序圖表
+                    </h2>
+                    <div class="relative" :style="{ height: chartHeight + 'px' }">
+                        <canvas ref="chartCanvas"></canvas>
+                    </div>
+                </div>
+
+                <!-- 統計資訊 -->
+                <div id="statsSection" v-if="!loading && !error && stats" class="bg-white rounded-2xl shadow-lg p-6">
+                    <h2 class="text-2xl font-bold text-gray-800 mb-4 flex items-center gap-2">
+                        <svg class="w-7 h-7 text-indigo-600" fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z"/>
+                            <path fill-rule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clip-rule="evenodd"/>
+                        </svg>
+                        統計資訊
+                    </h2>
+                    
+                    <!-- 設備選擇按鈕 -->
+                    <div class="flex gap-3 mb-6 flex-wrap">
+                        <button v-for="station in Object.keys(stats)" :key="station"
+                                @click="selectedStation = station"
+                                class="px-4 py-2 rounded-lg font-medium transition-all"
+                                :class="selectedStation === station 
+                                    ? 'bg-indigo-600 text-white shadow-md transform scale-105' 
+                                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'">
+                            {{ station }}
+                        </button>
+                    </div>
+                    
+                    <!-- 顯示選中設備的資訊 -->
+                    <div v-if="selectedStation && stats[selectedStation]" class="border border-gray-200 rounded-xl p-5 bg-gradient-to-br from-gray-50 to-white">
+                        <h3 class="font-bold text-xl text-gray-800 mb-4 pb-3 border-b-2 border-indigo-200">
+                            {{ selectedStation }} (Down Rate: {{ currentDownRate.toFixed(1) }}%)
+                        </h3>
+                        
+                        <!-- 總計 -->
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-5">
+                            <div class="bg-gradient-to-br from-red-50 to-red-100 rounded-xl p-4 border border-red-200">
+                                <div class="flex items-center gap-2 mb-2">
+                                    <div class="w-4 h-4 bg-red-500 rounded-full animate-pulse"></div>
+                                    <span class="font-semibold text-gray-800 text-lg">ALARM 總計</span>
+                                </div>
+                                <div class="text-gray-700 text-sm">
+                                    <div class="flex justify-between mb-1">
+                                        <span>次數：</span>
+                                        <span class="font-bold">{{ stats[selectedStation].ALARM.count }} 次</span>
+                                    </div>
+                                    <div class="flex justify-between">
+                                        <span>時長：</span>
+                                        <span class="font-bold">{{ stats[selectedStation].ALARM.totalMinutes.toFixed(0) }} 分 ({{ stats[selectedStation].ALARM.hours }}h)</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-4 border border-green-200">
+                                <div class="flex items-center gap-2 mb-2">
+                                    <div class="w-4 h-4 bg-green-500 rounded-full"></div>
+                                    <span class="font-semibold text-gray-800 text-lg">BUSY 總計</span>
+                                </div>
+                                <div class="text-gray-700 text-sm">
+                                    <div class="flex justify-between mb-1">
+                                        <span>次數：</span>
+                                        <span class="font-bold">{{ stats[selectedStation].BUSY.count }} 次</span>
+                                    </div>
+                                    <div class="flex justify-between">
+                                        <span>時長：</span>
+                                        <span class="font-bold">{{ stats[selectedStation].BUSY.totalMinutes.toFixed(0) }} 分 ({{ stats[selectedStation].BUSY.hours }}h)</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- 詳細時間列表 -->
+                        <div class="mt-5">
+                            <h4 class="font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                                <svg class="w-5 h-5 text-indigo-600" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clip-rule="evenodd"/>
+                                </svg>
+                                詳細時間記錄
+                            </h4>
+                            <div class="max-h-96 overflow-y-auto space-y-2 text-sm">
+                                <div v-for="(item, index) in stats[selectedStation].timeline" :key="index" 
+                                     class="flex items-center justify-between p-3 rounded-lg hover:shadow-md transition-all"
+                                     :class="item.status === 'ALARM' ? 'bg-red-50 border-l-4 border-red-500' : 'bg-green-50 border-l-4 border-green-500'">
+                                    <div class="flex items-center gap-2">
+                                        <div class="w-3 h-3 rounded-full" 
+                                             :class="item.status === 'ALARM' ? 'bg-red-500' : 'bg-green-500'"></div>
+                                        <span class="font-medium" :class="item.status === 'ALARM' ? 'text-red-700' : 'text-green-700'">
+                                            {{ item.status }}
+                                        </span>
+                                    </div>
+                                    <div class="flex items-center gap-3 text-gray-600">
+                                        <span>{{ item.startFormatted }}</span>
+                                        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                            <path fill-rule="evenodd" d="M12.293 5.293a1 1 0 011.414 0l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-2.293-2.293a1 1 0 010-1.414z" clip-rule="evenodd"/>
+                                        </svg>
+                                        <span>{{ item.endFormatted }}</span>
+                                        <span class="text-gray-500 font-semibold">({{ item.duration }}分)</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="side.js"></script>
+</body>
+</html>
