@@ -4,10 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>設備狀態時序圖</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/vue@3.3.4/dist/vue.global.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+    <script src="static/js/tailwinds.js"></script>
+    <script src="static/js/vue.global.js"></script>
+    <script src="static/js/chart.umd.min.js"></script>
+    <script src="static/js/chartjs-adapter-date-fns.bundle.min.js"></script>
     <style>
         * {
             margin: 0;
@@ -519,7 +519,7 @@
 
                             <!-- Process Code 選擇 -->
                             <div v-if="selectedBuilding === building && selectedFloor && availableProcessCodes.length > 0" class="mt-3 pt-3 border-t border-white/10">
-                                <div class="text-xs mb-2 opacity-60 uppercase tracking-widest">製程代號</div>
+                                <div class="text-xs mb-2 opacity-60 uppercase tracking-widest">站點</div>
                                 <div class="flex flex-wrap">
                                     <span
                                         v-for="code in availableProcessCodes"
@@ -529,9 +529,6 @@
                                         :class="{ active: selectedProcessCode === code }">
                                         {{ code }}
                                     </span>
-                                </div>
-                                <div v-if="selectedProcessCode" class="mt-2 text-xs opacity-50">
-                                    顯示 {{ filteredTimelineData.length }} 筆 / 共 {{ timelineData.length }} 筆
                                 </div>
                             </div>
                         </div>
@@ -600,9 +597,66 @@
                         </svg>
                         時序圖表
                     </h2>
-                    <div class="relative" :style="{ height: chartHeight + 'px' }">
-                        <canvas ref="chartCanvas"></canvas>
+                    <!-- 純 HTML/CSS 時序圖，不依賴 Canvas -->
+                    <div v-if="chartStations.length > 0">
+
+                        <!-- 每條 Station 一列 -->
+                        <div v-for="(station, idx) in chartStations" :key="station"
+                             :style="{ marginBottom: idx < chartStations.length - 1 ? '30px' : '0' }">
+                            <div style="display:flex; align-items:center; height:100px;">
+
+                                <!-- 左側標籤（完整顯示） -->
+                                <div :title="station"
+                                     style="flex-shrink:0; width:200px; min-width:200px; font-size:12px; font-weight:600; color:#1f2937; word-break:break-all; white-space:normal; line-height:1.4; padding-right:12px; display:flex; align-items:center;">
+                                    {{ station }}
+                                </div>
+
+                                <!-- 右側時序條（含每小時垂直參考線） -->
+                                <div style="flex:1; min-width:0; height:100px; position:relative; background:#f3f4f6; border-radius:4px; overflow:hidden;">
+                                    <!-- 每小時垂直參考線（渲染在色條之下） -->
+                                    <div v-for="tick in timeTicks" :key="'gl-'+tick.pos"
+                                         :style="{
+                                             position:'absolute', left: tick.pos+'%', top:'0', bottom:'0',
+                                             width:'1px',
+                                             background: tick.showLabel ? 'rgba(0,0,0,0.22)' : 'rgba(0,0,0,0.08)',
+                                             pointerEvents:'none'
+                                         }">
+                                    </div>
+                                    <!-- 狀態色條（DOM 在後，自動疊在參考線之上） -->
+                                    <div v-for="item in getStationItems(station)" :key="item.start"
+                                         :style="getBarStyle(item)"
+                                         :title="getBarTooltip(item)"
+                                         @click="onBarClick(station)">
+                                    </div>
+                                </div>
+
+                            </div>
+                        </div>
+
+                        <!-- X 軸時間標籤（每小時、斜向顯示） -->
+                        <div style="display:flex; margin-top:0;">
+                            <div style="flex-shrink:0; width:200px;"></div>
+                            <div style="flex:1; position:relative; height:80px;">
+                                <span v-for="tick in timeTickLabels" :key="tick.pos"
+                                      :style="{
+                                          position:'absolute',
+                                          left: tick.pos+'%',
+                                          bottom:'2px',
+                                          top:'auto',
+                                          transformOrigin:'0% 100%',
+                                          transform:'rotate(-45deg)',
+                                          fontSize:'10px',
+                                          color:'#4b5563',
+                                          whiteSpace:'nowrap',
+                                          lineHeight:'1'
+                                      }">
+                                    {{ tick.label }}
+                                </span>
+                            </div>
+                        </div>
+
                     </div>
+                    <div v-else style="color:#9ca3af; padding:20px 0;">載入中或無資料...</div>
                 </div>
 
                 <!-- 統計資訊 -->
@@ -705,6 +759,6 @@
         </div>
     </div>
 
-    <script src="side.js"></script>
+    <script src="static/js/app.js"></script>
 </body>
 </html>

@@ -52,8 +52,8 @@ print(f"已輸出 {len(df)} 筆的資料到 {csv_path}")
 #     result = conn.execute(
 #         update_sql,
 #         {
-#             "old_station": "K22-8F_烤箱",
-#             "new_station": "K22-8F_3380_烤箱Loader"
+#             "old_station": "第二套烤箱_Loader",
+#             "new_station": "K11-5F_3380_第二套烤箱_Loader"
 #         }
 #     )
 #     print(f"✅ 已更新 {result.rowcount} 筆資料")

@@ -5,7 +5,7 @@ const app = Vue.createApp({
             centerLoading: false, // 中間載入動畫狀態
             error: null,
             timelineData: [],
-            chart: null,
+            charts: [],
             stats: null,
             selectedStation: null,
             quickRange: 1,
@@ -25,8 +25,8 @@ const app = Vue.createApp({
     computed: {
         chartHeight() {
             // 使用未過濾的資料決定高度，避免切換製程代號時觸發 canvas 重建
-            const stations = [...new Set(this.timelineData.map(d => d.station))];
-            return Math.max(800, stations.length * 100);
+            const stations = [...new Set(this.filteredTimelineData.map(d => d.station))];
+            return Math.max(800, stations.length * 160);
         },
         currentDownRate() {
             if (!this.selectedStation || !this.stats[this.selectedStation]) return 0;
@@ -229,7 +229,7 @@ const app = Vue.createApp({
                 this.calculateStats();
                 
                 this.loading = false;
-                await this.$nextTick();
+                await this.$nextTick();   // 等 Vue 把 v-if 的 DOM 渲染出來
                 this.renderChart();
                 
                 // 隱藏中間載入動畫
@@ -376,7 +376,6 @@ const app = Vue.createApp({
         },
         
         renderChart() {
-            // Debounce：50ms 內多次呼叫只執行最後一次
             if (this._renderTimer) clearTimeout(this._renderTimer);
             this._renderTimer = setTimeout(() => {
                 this._renderTimer = null;
@@ -385,173 +384,151 @@ const app = Vue.createApp({
         },
 
         _doRender() {
-            const canvas = this.$refs.chartCanvas;
-            if (!canvas) return;
+            const container = this.$refs.chartContainer || document.getElementById('chartContainer');
+            if (!container) {
+                console.error('❌ chartContainer not found');
+                return;
+            }
 
-            // Chart.js 4.x 內建：清除此 canvas 上任何殘存的圖表實例
-            const stale = Chart.getChart(canvas);
-            if (stale) stale.destroy();
-            if (this.chart) { this.chart.destroy(); this.chart = null; }
+            // 銷毀所有舊圖表
+            (this.charts || []).forEach(c => { try { c.destroy(); } catch(e){} });
+            this.charts = [];
+            container.innerHTML = '';
 
-            const allStations = [...new Set(this.filteredTimelineData.map(d => d.station))];
-            
-            const stationDataCount = {};
-            allStations.forEach(station => {
-                stationDataCount[station] = this.filteredTimelineData.filter(d => d.station === station).length;
+            const stations = [...new Set(this.filteredTimelineData.map(d => d.station))];
+            console.log(`🔧 stations: ${stations.length}, data rows: ${this.filteredTimelineData.length}`);
+
+            if (stations.length === 0) return;
+
+            const statusColors = { 'ALARM': '#ef4444', 'BUSY': '#22c55e' };
+            const minTime = this.getChartMinTime();
+            const maxTime = this.getChartMaxTime();
+            const entries = [];
+
+            // ── Step 1: 建 DOM ──
+            stations.forEach((station, idx) => {
+                const isLast = idx === stations.length - 1;
+
+                const row = document.createElement('div');
+                row.style.cssText = 'display:flex;align-items:center;width:100%;height:100px;margin-bottom:' + (isLast ? '0' : '30px') + ';';
+
+                const label = document.createElement('div');
+                label.textContent = station;
+                label.style.cssText = 'flex-shrink:0;width:480px;font-size:100px;font-weight:600;line-height:100px;color:#1f2937;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-right:16px;';
+
+                const chartWrap = document.createElement('div');
+                chartWrap.style.cssText = 'flex:1;min-width:0;height:100px;position:relative;overflow:hidden;';
+
+                const canvas = document.createElement('canvas');
+                chartWrap.appendChild(canvas);
+                row.appendChild(label);
+                row.appendChild(chartWrap);
+                container.appendChild(row);
+
+                entries.push({ canvas, chartWrap, station, isLast });
             });
-            
-            const stations = allStations.filter(station => stationDataCount[station] > 0);
-            
-            const statusColors = {
-                'ALARM': '#ef4444',
-                'BUSY': '#22c55e'
-            };
-            
-            const allData = [];
-            const allColors = [];
-            
-            this.filteredTimelineData.forEach(item => {
-                allData.push({
+
+            // ── Step 2: 強制 reflow，確保取得真實寬高 ──
+            void container.offsetWidth;
+
+            // ── Step 3: 初始化每個 Chart ──
+            entries.forEach(({ canvas, chartWrap, station, isLast }) => {
+                const w = chartWrap.clientWidth || 800;
+                const h = 100;
+                canvas.width  = w;
+                canvas.height = h;
+
+                const stationData = this.filteredTimelineData.filter(d => d.station === station);
+                const data   = stationData.map(item => ({
                     x: [new Date(item.start), new Date(item.end)],
-                    y: item.station,
+                    y: station,
                     status: item.status,
                     duration: item.duration_minutes,
                     station: item.station
-                });
-                allColors.push(statusColors[item.status] || '#999');
-            });
-            
-            const ctx = this.$refs.chartCanvas.getContext('2d');
-            this.chart = new Chart(ctx, {
-                type: 'bar',
-                data: {
-                    datasets: [{
-                        label: '設備狀態',
-                        data: allData,
-                        backgroundColor: allColors,
-                        borderWidth: 1,
-                        borderColor: 'rgba(255, 255, 255, 0.3)',
-                        barThickness: 30
-                    }]
-                },
-                options: {
-                    indexAxis: 'y',
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    // 鼠標懸停時顯示手型游標
-                    onHover: (event, activeElements) => {
-                        event.native.target.style.cursor = activeElements.length > 0 ? 'pointer' : 'default';
-                    },
-                    // 添加點擊事件
-                    onClick: (event, activeElements) => {
-                        if (activeElements.length > 0) {
-                            const dataIndex = activeElements[0].index;
-                            const clickedData = allData[dataIndex];
-                            const clickedStation = clickedData.station;
-                            
-                            // 設置選中的設備
-                            this.selectedStation = clickedStation;
-                            
-                            // 滾動到統計資訊區域
-                            setTimeout(() => {
-                                const statsSection = document.getElementById('statsSection');
-                                if (statsSection) {
-                                    // 滾動到統計區域
-                                    statsSection.scrollIntoView({ 
-                                        behavior: 'smooth', 
-                                        block: 'start' 
-                                    });
-                                    
-                                    // 添加短暫的高亮效果
-                                    statsSection.style.boxShadow = '0 0 20px rgba(59, 130, 246, 0.5)';
+                }));
+                const colors = stationData.map(item => statusColors[item.status] || '#999');
+
+                try {
+                    const chart = new Chart(canvas, {
+                        type: 'bar',
+                        data: {
+                            datasets: [{
+                                data,
+                                backgroundColor: colors,
+                                borderWidth: 1,
+                                borderColor: 'rgba(255,255,255,0.3)',
+                                barPercentage: 1.0,
+                                categoryPercentage: 1.0
+                            }]
+                        },
+                        options: {
+                            indexAxis: 'y',
+                            responsive: false,
+                            animation: false,
+                            onHover: (event, activeElements) => {
+                                event.native.target.style.cursor = activeElements.length > 0 ? 'pointer' : 'default';
+                            },
+                            onClick: (event, activeElements) => {
+                                if (activeElements.length > 0) {
+                                    this.selectedStation = station;
                                     setTimeout(() => {
-                                        statsSection.style.boxShadow = '';
-                                    }, 1000);
-                                }
-                            }, 100);
-                            
-                            console.log('點擊了設備:', clickedStation);
-                        }
-                    },
-                    scales: {
-                        x: {
-                            type: 'time',
-                            time: {
-                                unit: 'hour',
-                                displayFormats: {
-                                    hour: 'MM/dd HH:mm'
+                                        const s = document.getElementById('statsSection');
+                                        if (s) {
+                                            s.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                                            s.style.boxShadow = '0 0 20px rgba(59,130,246,0.5)';
+                                            setTimeout(() => { s.style.boxShadow = ''; }, 1000);
+                                        }
+                                    }, 100);
                                 }
                             },
-                            min: this.getChartMinTime(),
-                            max: this.getChartMaxTime(),
-                            title: {
-                                display: true,
-                                text: '時間',
-                                font: { size: 14, weight: 'bold' }
-                            },
-                            grid: {
-                                color: 'rgba(0, 0, 0, 0.05)'
-                            }
-                        },
-                        y: {
-                            type: 'category',
-                            labels: stations,
-                            title: {
-                                display: true,
-                                text: '設備站點',
-                                font: { size: 14, weight: 'bold' }
-                            },
-                            grid: {
-                                display: false
-                            }
-                        }
-                    },
-                    plugins: {
-                        legend: {
-                            display: false
-                        },
-                        tooltip: {
-                            backgroundColor: 'rgba(0, 0, 0, 0.8)',
-                            padding: 12,
-                            titleFont: { size: 14, weight: 'bold' },
-                            bodyFont: { size: 13 },
-                            callbacks: {
-                                title: function(context) {
-                                    const data = context[0].raw;
-                                    return data.station;
+                            layout: { padding: 0 },
+                            scales: {
+                                x: {
+                                    type: 'time',
+                                    time: { unit: 'hour', displayFormats: { hour: 'MM/dd HH:mm' } },
+                                    min: minTime,
+                                    max: maxTime,
+                                    display: isLast,
+                                    grid: { color: 'rgba(0,0,0,0.05)' },
+                                    ticks: { font: { size: 12 } }
                                 },
-                                label: function(context) {
-                                    const data = context.raw;
-                                    const start = new Date(data.x[0]).toLocaleString('zh-TW', {
-                                        month: '2-digit',
-                                        day: '2-digit',
-                                        hour: '2-digit',
-                                        minute: '2-digit'
-                                    });
-                                    const end = new Date(data.x[1]).toLocaleString('zh-TW', {
-                                        month: '2-digit',
-                                        day: '2-digit',
-                                        hour: '2-digit',
-                                        minute: '2-digit'
-                                    });
-                                    const duration = data.duration.toFixed(1);
-                                    return [
-                                        `狀態: ${data.status}`,
-                                        `開始: ${start}`,
-                                        `結束: ${end}`,
-                                        `持續: ${duration} 分鐘`
-                                    ];
-                                },
-                                footer: function(context) {
-                                    return '💡 點擊查看詳細統計資訊';
+                                y: {
+                                    type: 'category',
+                                    labels: [station],
+                                    display: false,
+                                    grid: { display: false }
+                                }
+                            },
+                            plugins: {
+                                legend: { display: false },
+                                tooltip: {
+                                    backgroundColor: 'rgba(0,0,0,0.8)',
+                                    padding: 12,
+                                    titleFont: { size: 14, weight: 'bold' },
+                                    bodyFont: { size: 13 },
+                                    callbacks: {
+                                        title: () => station,
+                                        label: (ctx) => {
+                                            const d = ctx.raw;
+                                            const fmt = t => new Date(t).toLocaleString('zh-TW', {
+                                                month:'2-digit', day:'2-digit',
+                                                hour:'2-digit', minute:'2-digit'
+                                            });
+                                            return [`狀態: ${d.status}`, `開始: ${fmt(d.x[0])}`, `結束: ${fmt(d.x[1])}`, `持續: ${d.duration.toFixed(1)} 分鐘`];
+                                        },
+                                        footer: () => '💡 點擊查看詳細統計資訊'
+                                    }
                                 }
                             }
                         }
-                    }
+                    });
+                    this.charts.push(chart);
+                } catch(e) {
+                    console.error('❌ Chart 建立失敗:', station, e);
                 }
             });
-            
-            console.log('✅ 圖表已創建');
+
+            console.log(`✅ 完成 ${this.charts.length} 個圖表`);
         }
     }
 });
@@ -577,3 +554,6 @@ window.addEventListener('load', function() {
         }, 500); // 等待淡出動畫完成（0.5秒）
     }, 2000); // 2秒延遲
 });
+
+
+// 10.11.99.135:5003/
