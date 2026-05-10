@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>📋 所有任務</title>
+  <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      theme: { extend: { colors: { primary: '#818cf8', secondary: '#c084fc' }, fontFamily: { sans: ['Noto Sans TC', 'sans-serif'] } } }
+    }
+  </script>
+  <style>
+    [v-cloak] { display: none !important; }
+    * { box-sizing: border-box; }
+
+    body {
+      font-family: 'Noto Sans TC', sans-serif;
+      background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 30%, #312e81 100%);
+      background-attachment: fixed; min-height: 100vh; margin: 0; color: #fff;
+      transition: background 0.4s;
+    }
+    body.light {
+      background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 60%, #cbd5e1 100%);
+      color: #1e293b;
+    }
+    .glass-card {
+      background: rgba(15,23,42,0.65); backdrop-filter: blur(20px);
+      border: 1px solid rgba(255,255,255,0.15); border-radius: 1.5rem;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.4); transition: all 0.3s;
+    }
+    body.light .glass-card {
+      background: rgba(255,255,255,0.87); border-color: rgba(0,0,0,0.08);
+      box-shadow: 0 4px 24px rgba(0,0,0,0.1);
+    }
+    body.light .text-white    { color: #1e293b !important; }
+    body.light .text-gray-100,
+    body.light .text-gray-200,
+    body.light .text-gray-300  { color: #475569 !important; }
+    body.light .text-gray-400  { color: #64748b !important; }
+    body.light .border-white\/10 { border-color: rgba(0,0,0,0.08) !important; }
+    body.light .bg-white\/10   { background: rgba(0,0,0,0.05) !important; }
+    body.light .hover\:bg-white\/10:hover { background: rgba(0,0,0,0.06) !important; }
+    body.light .th-head { background: rgba(248,250,252,0.97) !important; }
+    body.light .badge   { background: rgba(99,102,241,0.12); color: #4338ca; border-color: rgba(99,102,241,0.25); }
+    body.light .search-box { background: rgba(0,0,0,0.05); border-color: rgba(0,0,0,0.15); color: #1e293b; }
+    body.light .filter-panel { background: #fff; border-color: rgba(0,0,0,0.12); box-shadow: 0 8px 32px rgba(0,0,0,0.15); }
+    body.light .fp-item:hover { background: rgba(0,0,0,0.04); }
+    body.light .fp-search { background: rgba(0,0,0,0.04); border-color: rgba(0,0,0,0.14); color: #1e293b; }
+    body.light .fp-label  { color: #334155; }
+
+    .badge {
+      padding: 0.2rem 0.55rem; border-radius: 9999px; font-size: 0.72rem; font-weight: 500;
+      display: inline-flex; align-items: center;
+      background: rgba(255,255,255,0.15); color: #fff; border: 1px solid rgba(255,255,255,0.2);
+    }
+    .btn-back {
+      display: inline-flex; align-items: center; gap: 0.5rem;
+      padding: 0.5rem 1.1rem; border-radius: 0.75rem; font-size: 0.875rem; font-weight: 500;
+      border: 1px solid rgba(255,255,255,0.25); color: #fff;
+      background: rgba(255,255,255,0.1); cursor: pointer; transition: all 0.2s; text-decoration: none;
+    }
+    .btn-back:hover { background: rgba(255,255,255,0.2); transform: translateX(-2px); }
+    body.light .btn-back { border-color: rgba(0,0,0,0.15); color: #334155; background: rgba(0,0,0,0.05); }
+    .theme-btn {
+      width: 2.4rem; height: 2.4rem; border-radius: 0.75rem; cursor: pointer;
+      display: flex; align-items: center; justify-content: center; font-size: 1rem;
+      border: 1px solid rgba(255,255,255,0.2); background: rgba(255,255,255,0.1); transition: all 0.2s;
+    }
+    .theme-btn:hover { background: rgba(255,255,255,0.2); }
+    body.light .theme-btn { border-color: rgba(0,0,0,0.14); background: rgba(0,0,0,0.05); }
+    .search-box {
+      background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 0.75rem; padding: 0.5rem 0.9rem; color: #fff; outline: none;
+      font-size: 0.875rem; font-family: inherit; transition: all 0.2s; width: 100%; max-width: 280px;
+    }
+    .search-box:focus { border-color: rgba(129,140,248,0.6); box-shadow: 0 0 0 3px rgba(129,140,248,0.15); }
+    input::placeholder { color: rgba(156,163,175,0.6); }
+
+    /* table */
+    .th-head {
+      background: rgba(15,23,42,0.92); backdrop-filter: blur(12px);
+      position: sticky; top: 0; z-index: 20;
+    }
+    .th-btn {
+      display: inline-flex; align-items: center; gap: 0.35rem; cursor: pointer;
+      padding: 0.55rem 0.7rem; border-radius: 0.45rem; transition: background 0.15s;
+      user-select: none; white-space: nowrap; font-weight: 500; font-size: 0.82rem;
+    }
+    .th-btn:hover { background: rgba(255,255,255,0.09); }
+    body.light .th-btn:hover { background: rgba(0,0,0,0.06); }
+    .th-caret { font-size: 0.6rem; opacity: 0.45; transition: all 0.15s; }
+    .th-btn.open   .th-caret { opacity: 1; color: #818cf8; transform: rotate(180deg); }
+    .th-btn.active .th-caret { opacity: 1; color: #34d399; }
+    .th-dot { width: 6px; height: 6px; border-radius: 50%; background: #34d399; flex-shrink: 0; margin-left: 2px; }
+
+    /* filter panel */
+    .filter-panel {
+      position: fixed; z-index: 9999; width: 216px;
+      background: rgba(13,20,40,0.98); backdrop-filter: blur(20px);
+      border: 1px solid rgba(255,255,255,0.16); border-radius: 0.75rem;
+      box-shadow: 0 16px 48px rgba(0,0,0,0.55);
+      display: flex; flex-direction: column; max-height: 320px;
+    }
+    .fp-search-wrap { padding: 0.6rem 0.6rem 0.35rem; flex-shrink: 0; }
+    .fp-search {
+      width: 100%; background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 0.45rem; padding: 0.33rem 0.6rem; color: #fff; outline: none;
+      font-size: 0.78rem; font-family: inherit;
+    }
+    .fp-search:focus { border-color: rgba(129,140,248,0.55); }
+    .fp-search::placeholder { color: rgba(156,163,175,0.45); font-size: 0.75rem; }
+    .fp-list { flex: 1; overflow-y: auto; padding: 0.15rem 0; }
+    .fp-list::-webkit-scrollbar { width: 3px; }
+    .fp-list::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.18); border-radius: 2px; }
+    .fp-item {
+      display: flex; align-items: center; gap: 0.5rem;
+      padding: 0.32rem 0.65rem; cursor: pointer; transition: background 0.1s;
+    }
+    .fp-item:hover { background: rgba(255,255,255,0.07); }
+    .fp-item input[type="checkbox"] { accent-color: #818cf8; width: 13px; height: 13px; flex-shrink: 0; cursor: pointer; }
+    .fp-label { font-size: 0.8rem; color: #cbd5e1; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+    .fp-empty { padding: 0.65rem; text-align: center; color: rgba(156,163,175,0.5); font-size: 0.78rem; }
+    .fp-footer { padding: 0.45rem 0.6rem; border-top: 1px solid rgba(255,255,255,0.1); flex-shrink: 0; }
+    .fp-clear-btn {
+      width: 100%; padding: 0.3rem 0; border-radius: 0.45rem; font-size: 0.75rem; font-weight: 600;
+      cursor: pointer; border: 1px solid rgba(239,68,68,0.35);
+      background: rgba(239,68,68,0.12); color: #f87171; transition: all 0.15s;
+    }
+    .fp-clear-btn:hover { background: rgba(239,68,68,0.25); color: #fca5a5; }
+    body.light .fp-footer { border-color: rgba(0,0,0,0.08); }
+    body.light .fp-clear-btn { border-color: rgba(239,68,68,0.3); background: rgba(239,68,68,0.07); }
+
+    .tag-overdue { color: #f87171; font-weight: 600; }
+    .tag-today   { color: #34d399; font-weight: 600; }
+    .tag-ok      { color: #94a3b8; }
+
+    .modal-fade-enter-active, .modal-fade-leave-active { transition: opacity 0.25s; }
+    .modal-fade-enter-from, .modal-fade-leave-to { opacity: 0; }
+    .modal-zoom-enter-active, .modal-zoom-leave-active { transition: all 0.3s cubic-bezier(0.4,0,0.2,1); }
+    .modal-zoom-enter-from, .modal-zoom-leave-to { opacity: 0; transform: scale(0.95) translateY(10px); }
+    .toast-enter-active, .toast-leave-active { transition: all 0.3s ease; }
+    .toast-enter-from { opacity: 0; transform: translateX(100px); }
+    .toast-leave-to   { opacity: 0; transform: translateX(20px); }
+  </style>
+</head>
+
+<body class="p-4 md:p-6">
+<div id="app" v-cloak>
+
+  <!-- ── Header ── -->
+  <header class="glass-card p-5 mb-5">
+    <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+      <div class="flex items-center gap-4">
+        <a href="index.html" class="btn-back"><i class="fas fa-arrow-left"></i>返回主頁</a>
+        <div class="w-10 h-10 bg-gradient-to-br from-primary to-secondary rounded-xl flex items-center justify-center shadow-lg">
+          <i class="fas fa-table-list text-white"></i>
+        </div>
+        <div>
+          <h1 class="text-xl md:text-2xl font-bold text-white">所有任務</h1>
+          <p class="text-gray-300 text-xs mt-0.5">
+            共 {{ filteredData.length }} 筆
+            <span v-if="hasAnyFilter" class="text-yellow-300 ml-1">（已篩選）</span>
+          </p>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- ── 表格 ── -->
+  <div class="glass-card p-0 overflow-hidden">
+    <div v-if="loading" class="p-8 space-y-3">
+      <div v-for="i in 6" :key="i" class="h-10 bg-white/10 rounded animate-pulse"></div>
+    </div>
+    <div v-else-if="filteredData.length === 0" class="flex flex-col items-center justify-center py-20 text-gray-400">
+      <i class="fas fa-filter text-5xl mb-4 opacity-30 block"></i>
+      <p class="text-lg">找不到符合條件的任務</p>
+      <button @click="resetAllFilters" class="mt-4 px-4 py-2 rounded-xl text-sm border border-white/20 text-gray-300 hover:bg-white/10 transition">
+        <i class="fas fa-rotate-left mr-1"></i>重置所有篩選
+      </button>
+    </div>
+    <div v-else class="overflow-x-auto">
+      <table class="w-full text-sm text-left" style="min-width: 1100px;">
+        <thead>
+          <tr class="text-gray-200 border-b border-white/10 th-head">
+
+            <!-- 日期 -->
+            <th class="font-medium p-0">
+              <div class="th-btn"
+                   :class="{ open: activeFilter === '日期', active: checkedDates.length > 0 }"
+                   @click.stop="openFilter('日期', $event)">
+                日期
+                <span v-if="checkedDates.length > 0" class="th-dot"></span>
+                <i class="fas fa-caret-down th-caret"></i>
+              </div>
+            </th>
+
+            <!-- 提案人 -->
+            <th class="font-medium p-0">
+              <div class="th-btn"
+                   :class="{ open: activeFilter === '提案人', active: checkedPersons.length > 0 }"
+                   @click.stop="openFilter('提案人', $event)">
+                提案人
+                <span v-if="checkedPersons.length > 0" class="th-dot"></span>
+                <i class="fas fa-caret-down th-caret"></i>
+              </div>
+            </th>
+
+            <!-- 棟別 -->
+            <th class="font-medium p-0">
+              <div class="th-btn"
+                   :class="{ open: activeFilter === '棟別', active: checkedBuildings.length > 0 }"
+                   @click.stop="openFilter('棟別', $event)">
+                棟別
+                <span v-if="checkedBuildings.length > 0" class="th-dot"></span>
+                <i class="fas fa-caret-down th-caret"></i>
+              </div>
+            </th>
+
+            <!-- 樓層 -->
+            <th class="font-medium p-0">
+              <div class="th-btn"
+                   :class="{ open: activeFilter === '樓層', active: checkedFloors.length > 0 }"
+                   @click.stop="openFilter('樓層', $event)">
+                樓層
+                <span v-if="checkedFloors.length > 0" class="th-dot"></span>
+                <i class="fas fa-caret-down th-caret"></i>
+              </div>
+            </th>
+
+            <!-- 站點 -->
+            <th class="font-medium p-0">
+              <div class="th-btn"
+                   :class="{ open: activeFilter === '站點', active: checkedSites.length > 0 }"
+                   @click.stop="openFilter('站點', $event)">
+                站點
+                <span v-if="checkedSites.length > 0" class="th-dot"></span>
+                <i class="fas fa-caret-down th-caret"></i>
+              </div>
+            </th>
+
+            <!-- 組織類別 -->
+            <th class="font-medium p-0">
+              <div class="th-btn"
+                   :class="{ open: activeFilter === '組織類別', active: checkedOrgs.length > 0 }"
+                   @click.stop="openFilter('組織類別', $event)">
+                組織類別
+                <span v-if="checkedOrgs.length > 0" class="th-dot"></span>
+                <i class="fas fa-caret-down th-caret"></i>
+              </div>
+            </th>
+
+            <!-- 案件分類 -->
+            <th class="font-medium p-0">
+              <div class="th-btn"
+                   :class="{ open: activeFilter === '案件分類', active: checkedCases.length > 0 }"
+                   @click.stop="openFilter('案件分類', $event)">
+                案件分類
+                <span v-if="checkedCases.length > 0" class="th-dot"></span>
+                <i class="fas fa-caret-down th-caret"></i>
+              </div>
+            </th>
+
+            <!-- 項目描述 -->
+            <th class="font-medium p-0">
+              <div class="th-btn"
+                   :class="{ open: activeFilter === '項目描述', active: checkedDescs.length > 0 }"
+                   @click.stop="openFilter('項目描述', $event)">
+                項目描述
+                <span v-if="checkedDescs.length > 0" class="th-dot"></span>
+                <i class="fas fa-caret-down th-caret"></i>
+              </div>
+            </th>
+
+            <!-- 管理OWNER -->
+            <th class="font-medium p-0">
+              <div class="th-btn"
+                   :class="{ open: activeFilter === '管理OWNER', active: checkedMgrs.length > 0 }"
+                   @click.stop="openFilter('管理OWNER', $event)">
+                管理OWNER
+                <span v-if="checkedMgrs.length > 0" class="th-dot"></span>
+                <i class="fas fa-caret-down th-caret"></i>
+              </div>
+            </th>
+
+            <!-- 項目Due -->
+            <th class="font-medium p-0">
+              <div class="th-btn"
+                   :class="{ open: activeFilter === '項目Due Date', active: checkedDues.length > 0 }"
+                   @click.stop="openFilter('項目Due Date', $event)">
+                項目Due
+                <span v-if="checkedDues.length > 0" class="th-dot"></span>
+                <i class="fas fa-caret-down th-caret"></i>
+              </div>
+            </th>
+
+            <!-- 距今 -->
+            <th class="font-medium p-0">
+              <div class="th-btn"
+                   :class="{ open: activeFilter === '距今', active: checkedAgos.length > 0 }"
+                   @click.stop="openFilter('距今', $event)">
+                距今
+                <span v-if="checkedAgos.length > 0" class="th-dot"></span>
+                <i class="fas fa-caret-down th-caret"></i>
+              </div>
+            </th>
+
+            <!-- 項目OWNER -->
+            <th class="font-medium p-0">
+              <div class="th-btn"
+                   :class="{ open: activeFilter === '項目OWNER', active: checkedOwners.length > 0 }"
+                   @click.stop="openFilter('項目OWNER', $event)">
+                項目OWNER
+                <span v-if="checkedOwners.length > 0" class="th-dot"></span>
+                <i class="fas fa-caret-down th-caret"></i>
+              </div>
+            </th>
+
+            <!-- 當前進度（不篩選） -->
+            <th class="font-medium py-2 px-3 text-gray-300 whitespace-nowrap">當前進度</th>
+
+            <!-- 操作 -->
+            <th class="font-medium py-2 px-3 text-center text-gray-300">操作</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="row in filteredData" :key="row['id']"
+              class="border-b border-white/10 hover:bg-white/10 transition">
+            <td class="py-2.5 px-3 text-gray-200 whitespace-nowrap">{{ row['日期'] || '—' }}</td>
+            <td class="py-2.5 px-3 text-white font-medium whitespace-nowrap">{{ row['提案人'] || '—' }}</td>
+            <td class="py-2.5 px-3 text-gray-200">{{ row['棟別'] || '—' }}</td>
+            <td class="py-2.5 px-3 text-gray-200">{{ row['樓層'] || '—' }}</td>
+            <td class="py-2.5 px-3 text-gray-200">{{ row['站點'] || '—' }}</td>
+            <td class="py-2.5 px-3"><span class="badge">{{ row['組織類別'] || '—' }}</span></td>
+            <td class="py-2.5 px-3 text-gray-200 whitespace-nowrap">{{ row['案件分類'] || '—' }}</td>
+            <td class="py-2.5 px-3 text-gray-100 max-w-[180px] truncate" :title="row['項目描述']">{{ row['項目描述'] || '—' }}</td>
+            <td class="py-2.5 px-3 text-gray-200 whitespace-nowrap">{{ row['管理OWNER'] || '—' }}</td>
+            <td class="py-2.5 px-3 whitespace-nowrap"
+                :class="row['距今']?.includes('逾期') ? 'text-red-400 font-medium' : 'text-gray-200'">
+              {{ row['項目Due Date'] || '—' }}</td>
+            <td class="py-2.5 px-3 whitespace-nowrap font-medium" :class="dueClass(row['距今'])">{{ row['距今'] || '—' }}</td>
+            <td class="py-2.5 px-3 text-gray-200 whitespace-nowrap">{{ row['項目OWNER'] || '—' }}</td>
+            <td class="py-2.5 px-3 text-gray-100 max-w-[150px] truncate" :title="row['當前最新進度']">{{ row['當前最新進度'] || '—' }}</td>
+            <td class="py-2.5 px-3 text-center space-x-2">
+              <button @click.stop="openView(row)" class="text-primary hover:text-white p-1.5 rounded-lg hover:bg-white/20"><i class="fas fa-eye text-xs"></i></button>
+              <button @click.stop="confirmDel(row)" class="text-red-400 hover:text-red-300 p-1.5 rounded-lg hover:bg-white/20"><i class="fas fa-trash-alt text-xs"></i></button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ══ 篩選浮動面板 ══ -->
+  <div v-if="activeFilter" class="filter-panel" :style="panelStyle" @click.stop>
+    <div class="fp-search-wrap">
+      <input class="fp-search" v-model="filterSearch" placeholder="搜尋選項...">
+    </div>
+    <div class="fp-list">
+      <div class="fp-item" @click="toggleAll">
+        <input type="checkbox" :checked="isAllChecked" :indeterminate.prop="isIndeterminate" readonly>
+        <span class="fp-label" style="font-weight:600;">（全選）</span>
+      </div>
+      <div v-for="val in currentOptions" :key="val" class="fp-item" @click="toggleVal(val)">
+        <input type="checkbox" :checked="currentChecked.includes(val)" readonly>
+        <span class="fp-label" :title="val">{{ val || '（空白）' }}</span>
+      </div>
+      <div v-if="currentOptions.length === 0" class="fp-empty">無符合選項</div>
+    </div>
+    <div class="fp-footer">
+      <button class="fp-clear-btn" @click="clearCurrentFilter">
+        <i class="fas fa-xmark mr-1"></i>清除篩選
+      </button>
+    </div>
+  </div>
+
+  <!-- ══ 查看 Modal ══ -->
+  <transition name="modal-fade">
+    <div v-if="showView" class="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4" @click.self="showView = false">
+      <transition name="modal-zoom">
+        <div class="glass-card p-6 max-w-4xl w-full shadow-2xl border border-white/20 max-h-[90vh] overflow-y-auto">
+          <div class="flex justify-between items-center mb-4 pb-3 border-b border-white/10">
+            <h3 class="text-xl font-bold text-white"><i class="fas fa-info-circle mr-2 text-primary"></i>任務詳情</h3>
+            <button @click="showView = false" class="text-gray-400 hover:text-white"><i class="fas fa-times text-xl"></i></button>
+          </div>
+          <div v-if="viewData" class="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+            <template v-for="(val, key) in viewData" :key="key">
+              <div v-if="key !== 'id'" class="p-3 bg-white/10 rounded-lg border border-white/10">
+                <div class="text-gray-400 text-xs mb-1">{{ key }}</div>
+                <div class="text-white font-medium break-words">{{ val || '未填寫' }}</div>
+              </div>
+            </template>
+          </div>
+          <div class="flex justify-end mt-6 pt-3 border-t border-white/10">
+            <button @click="showView = false" class="px-4 py-2 rounded-xl border border-white/25 text-white hover:bg-white/10 transition">關閉</button>
+          </div>
+        </div>
+      </transition>
+    </div>
+  </transition>
+
+  <!-- ══ 刪除 Modal ══ -->
+  <transition name="modal-fade">
+    <div v-if="showDel" class="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4" @click.self="showDel = false">
+      <transition name="modal-zoom">
+        <div class="glass-card p-6 max-w-md w-full shadow-2xl border border-white/20 text-center">
+          <div class="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+            <i class="fas fa-exclamation-triangle text-red-400 text-2xl"></i>
+          </div>
+          <h3 class="text-xl font-bold text-white mb-2">確認刪除？</h3>
+          <p class="text-gray-300 mb-6">此操作無法復原，確定要刪除這筆任務嗎？</p>
+          <div class="flex gap-3 justify-center">
+            <button @click="showDel = false" class="px-4 py-2 rounded-xl border border-white/25 text-white hover:bg-white/10 transition">取消</button>
+            <button @click="doDelete" class="px-4 py-2 rounded-xl text-white font-medium flex items-center gap-2"
+                    style="background:linear-gradient(to right,#ef4444,#dc2626)">
+              <i class="fas fa-trash-alt"></i>確認刪除
+            </button>
+          </div>
+        </div>
+      </transition>
+    </div>
+  </transition>
+
+  <!-- ══ Toast ══ -->
+  <transition-group name="toast">
+    <div v-for="t in toasts" :key="t.id"
+         class="fixed top-4 right-4 z-50 glass-card px-5 py-3 rounded-xl shadow-xl flex items-center gap-3 border-l-4 min-w-[260px]"
+         :class="t.type === 'success' ? 'border-l-green-400' : 'border-l-red-400'">
+      <i :class="t.type === 'success' ? 'fas fa-check-circle text-green-400' : 'fas fa-exclamation-circle text-red-400'"></i>
+      <span class="text-sm font-medium flex-1 text-white">{{ t.message }}</span>
+      <button @click="removeToast(t.id)" class="text-gray-400 hover:text-white"><i class="fas fa-times"></i></button>
+    </div>
+  </transition-group>
+
+</div>
+<script src="all.js"></script>
+</body>
+</html>

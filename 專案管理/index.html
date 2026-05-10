@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>📋 任務追蹤儀表板</title>
+  <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&display=swap" rel="stylesheet">
+
+  <script>
+    tailwind.config = {
+      theme: { extend: { colors: { primary: '#818cf8', secondary: '#c084fc' }, fontFamily: { sans: ['Noto Sans TC', 'sans-serif'] } } }
+    }
+  </script>
+
+  <style>
+    [v-cloak] { display: none !important; }
+
+    /* ══ 暗色主題（預設）══ */
+    body {
+      font-family: 'Noto Sans TC', sans-serif;
+      background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 30%, #312e81 100%);
+      background-attachment: fixed; min-height: 100vh; margin: 0; padding: 0;
+      color: #ffffff; transition: background 0.4s, color 0.4s;
+    }
+    .glass-card {
+      background: rgba(15,23,42,0.65); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(255,255,255,0.15); border-radius: 1.5rem;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.4); transition: all 0.3s ease;
+    }
+    .glass-card:hover { transform: translateY(-2px); box-shadow: 0 12px 40px rgba(0,0,0,0.5); }
+
+    /* ══ 亮色主題 ══ */
+    body.light {
+      background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 60%, #cbd5e1 100%);
+      color: #1e293b;
+    }
+    body.light .glass-card {
+      background: rgba(255,255,255,0.85);
+      border: 1px solid rgba(0,0,0,0.08);
+      box-shadow: 0 4px 24px rgba(0,0,0,0.1);
+    }
+    body.light .glass-card:hover { box-shadow: 0 8px 32px rgba(0,0,0,0.15); }
+    body.light h1,
+    body.light h2            { color: #1e293b !important; }
+    body.light .text-white   { color: #1e293b !important; }
+    body.light .text-gray-100,
+    body.light .text-gray-200,
+    body.light .text-gray-300 { color: #475569 !important; }
+    body.light .text-gray-400  { color: #64748b !important; }
+    body.light .border-white\/10 { border-color: rgba(0,0,0,0.08) !important; }
+    body.light .bg-white\/10 { background: rgba(0,0,0,0.05) !important; }
+    body.light .hover\:bg-white\/10:hover { background: rgba(0,0,0,0.07) !important; }
+    body.light .hover\:bg-white\/20:hover { background: rgba(0,0,0,0.1)  !important; }
+    body.light .th-sticky { background: rgba(255,255,255,0.92) !important; }
+    body.light .badge { background: rgba(99,102,241,0.12); color: #4338ca; border-color: rgba(99,102,241,0.25); }
+    body.light .btn-secondary { border-color: rgba(0,0,0,0.18); color: #334155; }
+    body.light .btn-secondary:hover { background: rgba(0,0,0,0.06); }
+    body.light .input-focus { background: rgba(0,0,0,0.04); color: #1e293b; border-color: rgba(0,0,0,0.16); }
+    body.light input::placeholder,
+    body.light textarea::placeholder { color: #94a3b8; }
+    body.light select option { background: #fff; color: #1e293b; }
+    body.light .field-label  { color: #4338ca; }
+    body.light .field-hint   { color: #94a3b8; }
+
+    /* ══ 通用 ══ */
+    .badge {
+      padding: 0.2rem 0.55rem; border-radius: 9999px; font-size: 0.72rem;
+      font-weight: 500; display: inline-flex; align-items: center;
+      background: rgba(255,255,255,0.15); color: #fff; border: 1px solid rgba(255,255,255,0.2);
+    }
+    .btn-primary {
+      background: linear-gradient(to right, #818cf8, #c084fc); color: #fff;
+      padding: 0.6rem 1.4rem; border-radius: 0.75rem; font-weight: 500; border: none; cursor: pointer;
+      box-shadow: 0 4px 12px rgba(129,140,248,0.3); transition: all 0.2s ease;
+      display: inline-flex; align-items: center; justify-content: center;
+    }
+    .btn-primary:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 8px 20px rgba(129,140,248,0.4); }
+    .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+    .btn-secondary {
+      padding: 0.5rem 1.25rem; border-radius: 0.75rem; border: 1px solid rgba(255,255,255,0.3);
+      color: #fff; transition: all 0.2s; font-weight: 500; background: transparent; cursor: pointer;
+    }
+    .btn-secondary:hover { background: rgba(255,255,255,0.1); }
+
+    /* 主題切換按鈕 */
+    .theme-btn {
+      width: 2.4rem; height: 2.4rem; border-radius: 0.75rem; cursor: pointer;
+      display: flex; align-items: center; justify-content: center; font-size: 1rem;
+      transition: all 0.2s; border: 1px solid rgba(255,255,255,0.2);
+      background: rgba(255,255,255,0.1);
+    }
+    .theme-btn:hover { background: rgba(255,255,255,0.2); transform: scale(1.08); }
+    body.light .theme-btn { border-color: rgba(0,0,0,0.14); background: rgba(0,0,0,0.05); }
+    body.light .theme-btn:hover { background: rgba(0,0,0,0.1); }
+
+    /* 輸入框 */
+    .input-focus {
+      outline: none; background: rgba(255,255,255,0.08); color: #fff;
+      border: 1px solid rgba(255,255,255,0.2); padding: 0.6rem 0.9rem; border-radius: 0.75rem;
+      transition: all 0.2s; width: 100%; font-size: 0.875rem; font-family: inherit;
+    }
+    .input-focus:focus { border-color: rgba(129,140,248,0.7); box-shadow: 0 0 0 3px rgba(129,140,248,0.18); background: rgba(255,255,255,0.12); }
+    .input-focus.has-value { border-color: rgba(129,140,248,0.45); }
+    input::placeholder, textarea::placeholder { color: rgba(156,163,175,0.7); font-size: 0.82rem; }
+    select option { background: #0f172a; color: #fff; }
+    textarea.input-focus { min-height: 80px; resize: none; }
+
+    .field-label {
+      display: flex; align-items: center; gap: 0.4rem;
+      font-size: 0.75rem; font-weight: 600; letter-spacing: 0.04em;
+      color: #c4c8f8; margin-bottom: 0.3rem; text-transform: uppercase;
+    }
+    .field-label .required { color: #f87171; margin-left: 2px; }
+    .field-hint { font-size: 0.72rem; color: rgba(156,163,175,0.7); margin-top: 0.2rem; }
+
+    /* 表格 */
+    .table-scroll { overflow-x: auto; }
+    .table-scroll table { width: 100%; table-layout: auto; }
+    .th-sticky {
+      background: rgba(15,23,42,0.85); backdrop-filter: blur(8px);
+      position: sticky; top: 0; z-index: 10;
+    }
+
+    /* Modals / Toast */
+    .modal-fade-enter-active, .modal-fade-leave-active { transition: opacity 0.25s ease; }
+    .modal-fade-enter-from, .modal-fade-leave-to { opacity: 0; }
+    .modal-zoom-enter-active, .modal-zoom-leave-active { transition: all 0.3s cubic-bezier(0.4,0,0.2,1); }
+    .modal-zoom-enter-from, .modal-zoom-leave-to { opacity: 0; transform: scale(0.95) translateY(10px); }
+    .toast-enter-active, .toast-leave-active { transition: all 0.3s ease; }
+    .toast-enter-from { opacity: 0; transform: translateX(100px); }
+    .toast-leave-to   { opacity: 0; transform: translateX(20px); }
+  </style>
+</head>
+
+<body class="p-4 md:p-6">
+<div id="app" v-cloak>
+
+  <!-- ══ Header ══ -->
+  <header class="glass-card p-5 mb-5">
+    <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+      <div class="flex items-center gap-4">
+        <div class="w-12 h-12 bg-gradient-to-br from-primary to-secondary rounded-2xl flex items-center justify-center shadow-lg flex-shrink-0">
+          <i class="fas fa-clipboard-list text-white text-xl"></i>
+        </div>
+        <div>
+          <h1 class="text-2xl md:text-3xl font-bold text-white">📋 任務追蹤儀表板</h1>
+          <p class="text-gray-300 text-sm mt-0.5"><i class="far fa-calendar-alt mr-1"></i>{{ currentDate }}</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-3 flex-wrap">
+        <div class="bg-white/10 px-4 py-2 rounded-xl text-center min-w-[80px]">
+          <div class="text-xl font-bold text-white">{{ todayList.length }}</div>
+          <div class="text-xs text-gray-300">今日新增</div>
+        </div>
+        <div class="bg-white/10 px-4 py-2 rounded-xl text-center min-w-[80px]">
+          <div class="text-xl font-bold text-red-400">{{ dueList.length }}</div>
+          <div class="text-xs text-gray-300">到期/逾期</div>
+        </div>
+        <button class="theme-btn" @click="lightMode = !lightMode" :title="lightMode ? '切換深色' : '切換淺色'">
+          <i :class="lightMode ? 'fas fa-moon text-indigo-500' : 'fas fa-sun text-yellow-300'"></i>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- ══ 篩選列 ══ -->
+  <div class="glass-card p-4 mb-5 flex flex-col md:flex-row justify-between items-center gap-4">
+    <div class="flex items-center gap-2 flex-wrap w-full md:w-auto">
+      <i class="fas fa-filter text-primary text-sm"></i>
+      <span class="font-semibold text-gray-200 text-sm">組織篩選：</span>
+      <label v-for="o in orgOptions" :key="o"
+             class="flex items-center gap-1 px-3 py-1 rounded-lg border border-white/20 cursor-pointer hover:border-primary hover:bg-white/10 transition-all select-none text-sm"
+             :class="selectedOrg.includes(o) ? 'bg-primary/30 border-primary' : 'bg-white/5'">
+        <input type="checkbox" v-model="selectedOrg" :value="o" class="accent-primary">
+        <span class="text-white">{{ o }}</span>
+      </label>
+      <button v-if="selectedOrg.length > 0" @click="selectedOrg = []" class="text-xs text-gray-400 hover:text-white ml-1 transition">
+        <i class="fas fa-times-circle mr-1"></i>清除
+      </button>
+    </div>
+    <button @click="openAddModal" class="btn-primary w-full md:w-auto">
+      <i class="fas fa-plus mr-2"></i>新增任務
+    </button>
+  </div>
+
+  <!-- ══ 今日新增 + 到期/逾期 並排 ══ -->
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-5">
+
+    <!-- 今日新增 -->
+    <section class="glass-card p-5 flex flex-col">
+      <div class="flex justify-between items-center mb-4 pb-3 border-b border-white/10 flex-shrink-0">
+        <div class="flex items-center gap-2">
+          <div class="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+          <h2 class="text-base font-bold text-white">✨ 今日新增</h2>
+        </div>
+        <span class="text-xs text-gray-300 bg-white/10 px-3 py-1 rounded-full">{{ todayList.length }} 筆</span>
+      </div>
+      <div v-if="loading" class="space-y-2">
+        <div v-for="i in 3" :key="i" class="h-10 bg-white/10 rounded animate-pulse"></div>
+      </div>
+      <div v-else-if="todayList.length === 0" class="flex flex-col items-center justify-center py-10 text-gray-400">
+        <i class="fas fa-inbox text-4xl mb-3 opacity-40 block"></i>
+        <p>尚無今日新增任務</p>
+      </div>
+      <div v-else class="table-scroll">
+        <table class="w-full text-sm text-left">
+          <thead>
+            <tr class="text-gray-200 border-b border-white/10 th-sticky">
+              <th class="py-2 px-3 font-medium">提案人</th>
+              <th class="py-2 px-3 font-medium">組織類別</th>
+              <th class="py-2 px-3 font-medium">項目描述</th>
+              <th class="py-2 px-3 font-medium">項目Due</th>
+              <th class="py-2 px-3 font-medium text-center">操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="row in todayList" :key="row['id']" class="border-b border-white/10 hover:bg-white/10 transition">
+              <td class="py-2 px-3 text-white whitespace-nowrap">{{ row['提案人'] }}</td>
+              <td class="py-2 px-3"><span class="badge">{{ row['組織類別'] }}</span></td>
+              <td class="py-2 px-3 text-gray-100 truncate max-w-[160px]" :title="row['項目描述']">{{ row['項目描述'] }}</td>
+              <td class="py-2 px-3 font-medium whitespace-nowrap"
+                  :class="row['距今']?.includes('逾期') ? 'text-red-400' : 'text-gray-200'">{{ row['項目Due Date'] }}</td>
+              <td class="py-2 px-3 text-center space-x-2">
+                <button @click="openViewModal(row)" class="text-primary hover:text-white p-1 rounded-lg hover:bg-white/20" title="查看"><i class="fas fa-eye text-xs"></i></button>
+                <button @click="confirmDelete(row)" class="text-red-400 hover:text-red-300 p-1 rounded-lg hover:bg-white/20" title="刪除"><i class="fas fa-trash-alt text-xs"></i></button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- 到期 / 逾期 -->
+    <section class="glass-card p-5 flex flex-col">
+      <div class="flex justify-between items-center mb-4 pb-3 border-b border-white/10 flex-shrink-0">
+        <div class="flex items-center gap-2">
+          <div class="w-2 h-2 bg-red-400 rounded-full animate-pulse"></div>
+          <h2 class="text-base font-bold text-red-400">⚠️ 到期 / 逾期</h2>
+        </div>
+        <span class="text-xs text-gray-300 bg-white/10 px-3 py-1 rounded-full">{{ dueList.length }} 筆</span>
+      </div>
+      <div v-if="dueList.length === 0" class="flex flex-col items-center justify-center py-10 text-gray-400">
+        <i class="fas fa-check-circle text-4xl mb-3 opacity-40 block text-green-400"></i>
+        <p>🎉 沒有待處理的到期任務！</p>
+      </div>
+      <div v-else class="table-scroll">
+        <table class="w-full text-sm text-left">
+          <thead>
+            <tr class="text-gray-200 border-b border-white/10 th-sticky">
+              <th class="py-2 px-3 font-medium">提案人</th>
+              <th class="py-2 px-3 font-medium">項目描述</th>
+              <th class="py-2 px-3 font-medium">項目Due</th>
+              <th class="py-2 px-3 font-medium">距今</th>
+              <th class="py-2 px-3 font-medium text-center">操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="row in dueList" :key="row['id']" class="border-b border-white/10 hover:bg-red-500/10 transition">
+              <td class="py-2 px-3 text-white whitespace-nowrap">{{ row['提案人'] }}</td>
+              <td class="py-2 px-3 truncate max-w-[160px] text-gray-100" :title="row['項目描述']">{{ row['項目描述'] }}</td>
+              <td class="py-2 px-3 font-medium text-red-400 whitespace-nowrap">{{ row['項目Due Date'] }}</td>
+              <td class="py-2 px-3 font-medium whitespace-nowrap"
+                  :class="row['距今']?.includes('逾期') ? 'text-red-400' : 'text-orange-300'">{{ row['距今'] }}</td>
+              <td class="py-2 px-3 text-center space-x-2">
+                <button @click="openViewModal(row)" class="text-primary hover:text-white p-1 rounded-lg hover:bg-white/20"><i class="fas fa-eye text-xs"></i></button>
+                <button @click="confirmDelete(row)" class="text-red-400 hover:text-red-300 p-1 rounded-lg hover:bg-white/20"><i class="fas fa-trash-alt text-xs"></i></button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+  </div><!-- /grid -->
+
+  <!-- ══ 新增任務 Modal ══ -->
+  <transition name="modal-fade">
+    <div v-if="showAddModal" class="fixed inset-0 bg-black/75 backdrop-blur-sm flex items-center justify-center z-50 p-4" @click.self="showAddModal = false">
+      <transition name="modal-zoom">
+        <div class="glass-card w-full max-w-lg shadow-2xl border border-white/20 flex flex-col" style="max-height:92vh;">
+          <div class="flex justify-between items-center px-6 pt-6 pb-4 border-b border-white/10 flex-shrink-0">
+            <div>
+              <h3 class="text-lg font-bold text-white"><i class="fas fa-plus-circle mr-2 text-primary"></i>新增任務</h3>
+              <p class="text-xs text-gray-400 mt-0.5">帶 <span class="text-red-400">*</span> 為必填欄位</p>
+            </div>
+            <button @click="showAddModal = false" class="text-gray-400 hover:text-white w-8 h-8 flex items-center justify-center rounded-lg hover:bg-white/10 transition">
+              <i class="fas fa-times"></i>
+            </button>
+          </div>
+          <div class="flex-1 overflow-y-auto px-6 py-5 space-y-4">
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <div class="field-label"><i class="fas fa-calendar text-indigo-300 text-xs"></i>日期<span class="required">*</span></div>
+                <input type="date" v-model="addForm['日期']" class="input-focus" :class="addForm['日期'] ? 'has-value' : ''">
+              </div>
+              <div>
+                <div class="field-label"><i class="fas fa-user text-indigo-300 text-xs"></i>提案人<span class="required">*</span></div>
+                <input type="text" v-model="addForm['提案人']" placeholder="如：王羽" class="input-focus" :class="addForm['提案人'] ? 'has-value' : ''">
+              </div>
+            </div>
+            <div class="grid grid-cols-3 gap-3">
+              <div>
+                <div class="field-label"><i class="fas fa-building text-purple-300 text-xs"></i>棟別</div>
+                <input type="text" v-model="addForm['棟別']" placeholder="如：A棟" class="input-focus">
+              </div>
+              <div>
+                <div class="field-label"><i class="fas fa-layer-group text-purple-300 text-xs"></i>樓層</div>
+                <input type="text" v-model="addForm['樓層']" placeholder="如：3F" class="input-focus">
+              </div>
+              <div>
+                <div class="field-label"><i class="fas fa-server text-purple-300 text-xs"></i>站點</div>
+                <input type="text" v-model="addForm['站點']" placeholder="如：Server01" class="input-focus">
+              </div>
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <div class="field-label"><i class="fas fa-sitemap text-cyan-300 text-xs"></i>組織類別<span class="required">*</span></div>
+                <select v-model="addForm['組織類別']" class="input-focus" :class="addForm['組織類別'] ? 'has-value' : ''">
+                  <option v-for="o in orgOptions" :key="o" :value="o">{{ o }}</option>
+                </select>
+              </div>
+              <div>
+                <div class="field-label"><i class="fas fa-folder text-cyan-300 text-xs"></i>案件分類<span class="required">*</span></div>
+                <select v-model="addForm['案件分類']" class="input-focus" :class="addForm['案件分類'] ? 'has-value' : ''">
+                  <option v-for="c in caseOptions" :key="c" :value="c">{{ c }}</option>
+                </select>
+              </div>
+            </div>
+          </div>
+          <div v-if="formError" class="px-6 pb-2 flex-shrink-0">
+            <p class="text-red-400 text-xs flex items-center gap-2"><i class="fas fa-exclamation-circle"></i>{{ formError }}</p>
+          </div>
+          <div class="flex justify-end gap-3 px-6 py-4 border-t border-white/10 flex-shrink-0">
+            <button type="button" @click="showAddModal = false" class="btn-secondary">取消</button>
+            <button type="button" @click="submitAddTask" :disabled="submitting" class="btn-primary min-w-[110px]">
+              <i v-if="submitting" class="fas fa-spinner animate-spin mr-2"></i>
+              {{ submitting ? '寫入中...' : '✅ 確認新增' }}
+            </button>
+          </div>
+        </div>
+      </transition>
+    </div>
+  </transition>
+
+  <!-- ══ 查看 Modal ══ -->
+  <transition name="modal-fade">
+    <div v-if="showViewModal" class="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4" @click.self="showViewModal = false">
+      <transition name="modal-zoom">
+        <div class="glass-card p-6 max-w-4xl w-full shadow-2xl border border-white/20 max-h-[90vh] overflow-y-auto">
+          <div class="flex justify-between items-center mb-4 pb-3 border-b border-white/10">
+            <h3 class="text-xl font-bold text-white"><i class="fas fa-info-circle mr-2 text-primary"></i>任務詳情</h3>
+            <button @click="showViewModal = false" class="text-gray-400 hover:text-white"><i class="fas fa-times text-xl"></i></button>
+          </div>
+          <div v-if="viewData" class="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+            <template v-for="(val, key) in viewData" :key="key">
+              <div v-if="key !== 'id'" class="p-3 bg-white/10 rounded-lg border border-white/10">
+                <div class="text-gray-400 text-xs mb-1">{{ key === '日期' ? '到期日' : key }}</div>
+                <div class="text-white font-medium break-words">{{ val || '未填寫' }}</div>
+              </div>
+            </template>
+          </div>
+          <div class="flex justify-end mt-6 pt-3 border-t border-white/10">
+            <button @click="showViewModal = false" class="btn-secondary">關閉</button>
+          </div>
+        </div>
+      </transition>
+    </div>
+  </transition>
+
+  <!-- ══ 刪除 Modal ══ -->
+  <transition name="modal-fade">
+    <div v-if="showDeleteModal" class="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4" @click.self="showDeleteModal = false">
+      <transition name="modal-zoom">
+        <div class="glass-card p-6 max-w-md w-full shadow-2xl border border-white/20">
+          <div class="text-center">
+            <div class="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+              <i class="fas fa-exclamation-triangle text-red-400 text-2xl"></i>
+            </div>
+            <h3 class="text-xl font-bold text-white mb-2">確認刪除？</h3>
+            <p class="text-gray-300 mb-6">此操作無法復原，確定要刪除這筆任務嗎？</p>
+            <div class="flex gap-3 justify-center">
+              <button @click="showDeleteModal = false" class="btn-secondary">取消</button>
+              <button @click="doDelete" class="btn-primary flex items-center gap-2" style="background:linear-gradient(to right,#ef4444,#dc2626)">
+                <i class="fas fa-trash-alt"></i>確認刪除
+              </button>
+            </div>
+          </div>
+        </div>
+      </transition>
+    </div>
+  </transition>
+
+  <!-- ══ 查看全部 FAB ══ -->
+  <a href="all.html"
+     class="fixed bottom-6 right-6 z-40 w-14 h-14 rounded-full shadow-2xl flex items-center justify-center transition-all duration-200 hover:scale-110"
+     style="background: linear-gradient(135deg, #818cf8, #c084fc); box-shadow: 0 6px 24px rgba(129,140,248,0.5);"
+     title="查看所有任務">
+    <i class="fas fa-table-list text-white text-xl"></i>
+  </a>
+
+  <!-- ══ Toast ══ -->
+  <transition-group name="toast">
+    <div v-for="toast in toasts" :key="toast.id"
+         class="fixed top-4 right-4 z-50 glass-card px-5 py-3 rounded-xl shadow-xl flex items-center gap-3 border-l-4 min-w-[280px] border border-white/20"
+         :class="toast.type === 'success' ? 'border-l-green-400' : 'border-l-red-400'">
+      <i :class="toast.type === 'success' ? 'fas fa-check-circle text-green-400 text-lg' : 'fas fa-exclamation-circle text-red-400 text-lg'"></i>
+      <span class="text-sm font-medium flex-1 text-white">{{ toast.message }}</span>
+      <button @click="removeToast(toast.id)" class="text-gray-400 hover:text-white"><i class="fas fa-times"></i></button>
+    </div>
+  </transition-group>
+
+</div><!-- /app -->
+
+<script src="app.js"></script>
+</body>
+</html>
