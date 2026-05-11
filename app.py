@@ -81,6 +81,48 @@ main_logger.info(f"[INFO] 程式啟動 | Building:{BUILDING} Floor:{FLOOR} Sourc
 main_logger.info(f"[INFO] TV_API: {TV_url}")
 main_logger.info(f"[INFO] Dashboard_API: {DASHBOARD_URL}")
 
+# =====================================================
+# 狀態持久化（避免重開程式 / 斷線重連後誤觸 Dashboard）
+# =====================================================
+STATE_DIR = os.path.join(get_base_dir(), "state")
+
+def save_last_state(machine_id, state):
+    """
+    將設備最後一次上拋的狀態寫入 JSON 檔案，供下次程式啟動時恢復使用。
+    - 狀態檔存放於 state/{MachineID}.json
+    - 寫入失敗只記錄警告，不中斷程式
+    """
+    os.makedirs(STATE_DIR, exist_ok=True)
+    path = os.path.join(STATE_DIR, f"{machine_id}.json")
+    try:
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(
+                {
+                    "state":      state,
+                    "updated_at": datetime.now().isoformat()
+                },
+                f,
+                ensure_ascii=False
+            )
+    except Exception as e:
+        main_logger.warning(f"[WARN] 無法儲存 {machine_id} 狀態：{e}")
+
+
+def load_last_state(machine_id):
+    """
+    從 JSON 檔案讀取設備上次狀態。
+    - 找不到檔案（第一次執行）→ 回傳 None，行為與原始啟動相同
+    - 讀取 / 解析失敗 → 回傳 None
+    """
+    path = os.path.join(STATE_DIR, f"{machine_id}.json")
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            return json.load(f).get("state")
+    except FileNotFoundError:
+        return None
+    except Exception as e:
+        main_logger.warning(f"[WARN] 無法讀取 {machine_id} 狀態：{e}")
+        return None
 
 
 def get_device_logger(ip):
@@ -297,6 +339,45 @@ def heartbeat_thread():
         main_logger.info(f'''[💓 心跳] 監控中設備數：{count} | {datetime.now().strftime('%H:%M:%S')}''')
         time.sleep(5)
 
+
+
+# =====================================================
+# 主動 Ping 檢測
+# =====================================================
+import subprocess
+import platform
+
+def ping_host(ip):
+    """
+    對目標 IP 發送一次 ICMP ping，確認主機是否存活。
+
+    Args:
+        ip (str): 目標設備 IP。
+
+    Returns:
+        bool: True 表示有回應（存活），False 表示無回應（可能關機或網路中斷）。
+    """
+    system = platform.system().lower()
+
+    # Windows 使用 -n（次數）-w（毫秒）；Linux/Mac 使用 -c（次數）-W（秒）
+    if system == "windows":
+        cmd = ["ping", "-n", "1", "-w", "2000", ip]
+    else:
+        cmd = ["ping", "-c", "1", "-W", "2", ip]
+
+    try:
+        result = subprocess.run(
+            cmd,
+            stdout=subprocess.DEVNULL,  # 不印出 ping 的輸出內容
+            stderr=subprocess.DEVNULL,
+            timeout=5                   # 最多等 5 秒，避免卡住整個重連流程
+        )
+        return result.returncode == 0   # returncode=0 表示有收到回應
+    except Exception as e:
+        main_logger.warning(f"[WARN] ping {ip} 執行失敗：{e}")
+        return False
+
+
 # =====================================================
 # 設備監控核心
 # =====================================================
@@ -306,13 +387,21 @@ def poll_machine(machine, stop_flag):
     port       = machine.get("Port", 502)
     machine_id = machine["MachineID"]
 
-    # 印出開始監控的訊息
+    # 印出開始監控的訊息到主控台
     main_logger.info(f"[INFO] 開始監控設備 {machine_id} ({ip}:{port})")
 
-    # 記錄上一次上拋的狀態，None 表示尚未上拋過
-    last_state = None
+    # 寫入設備獨立 log 檔：記錄程式啟動時間點
+    log = get_device_logger(ip)
+    log.info(f"[INFO] {machine_id} 🚀 程式啟動，開始監控 ({ip}:{port})")
+
+    # 從持久化檔案恢復上次狀態，避免重開程式後誤觸 Dashboard
+    # 若無歷史紀錄（第一次執行），回傳 None，行為與原始啟動相同
+    last_state = load_last_state(machine_id)
+    main_logger.info(f"[INFO] {machine_id} 上次狀態：{last_state or '(無紀錄，首次啟動)'}")
+
     # 記錄定時派報已觸發的時間點，避免同一時間點重複上拋
     last_timed_post_key = None
+
     # 記錄第一次斷線的時間，None 表示目前連線正常
     disconnect_time = None
 
@@ -341,7 +430,7 @@ def poll_machine(machine, stop_flag):
                     # 拋出例外讓外層 except 接住，等 5 秒後重試
                     raise ConnectionError(f"{ip} 無法連線")
 
-                # 連線成功，印出提示
+                # 連線成功，印出提示到主控台
                 main_logger.info(f"[INFO] {machine_id} ✅ 連線成功")
                 # 寫入檔案 log
                 log_reconnect(ip, machine_id, success=True)
@@ -352,13 +441,14 @@ def poll_machine(machine, stop_flag):
                     duration = datetime.now() - disconnect_time
                     # 轉換為分鐘和秒
                     m, s = divmod(int(duration.total_seconds()), 60)
-                    # 印出斷線時長警告
+                    # 印出斷線時長警告到主控台
                     main_logger.warning(f"[🔌 重連成功] {machine_id} 斷線時長：{m} 分 {s} 秒")
                     # 重置斷線時間
                     disconnect_time = None
 
-                # 重連後強制將 last_state 歸零，確保第一次讀到的狀態一定會上拋
-                last_state = None
+                # 【移除】原本重連後會強制將 last_state = None
+                # 保留 last_state 的目的：讓重連後只有狀態真正改變才觸發上拋
+                # 若重連期間設備狀態確實改變，下方邏輯會正確偵測到並上拋
 
                 # 內層迴圈：連線正常時每秒讀取一次設備狀態
                 while not stop_event.is_set() and not stop_flag.is_set():
@@ -397,6 +487,9 @@ def poll_machine(machine, stop_flag):
                             post_dashboard_alarm(machine, state, prev_state=last_state)
                             # 更新記錄的狀態
                             last_state = state
+                            # 同步將最新狀態持久化至檔案
+                            # 確保下次程式啟動或斷線重連後能恢復，不重複觸發 Dashboard
+                            save_last_state(machine_id, state)
 
                         # 取得當下時間
                         now = datetime.now()
@@ -429,10 +522,37 @@ def poll_machine(machine, stop_flag):
                         break
 
         except Exception as e:
-            # 外層連線失敗，印出錯誤並等待 5 秒後重試
+            # 外層連線失敗，印出錯誤訊息
             main_logger.error(f"[ERROR] {machine_id} 通訊錯誤，5 秒後重試：{e}")
+
+            # 若已斷線超過 10 分鐘，主動 ping 確認主機是否存活
+            if disconnect_time is not None:
+                elapsed = (datetime.now() - disconnect_time).total_seconds()
+
+                if elapsed >= 600:  # 600 秒 = 10 分鐘
+                    main_logger.warning(
+                        f"[🔍 主動 Ping] {machine_id} 已斷線 "
+                        f"{int(elapsed // 60)} 分 {int(elapsed % 60)} 秒，正在 ping {ip}..."
+                    )
+                    alive = ping_host(ip)
+
+                    if alive:
+                        # 主機有回應，代表網路通但 Modbus 服務可能異常
+                        main_logger.info(f"[🟢 Ping 有回應] {machine_id} ({ip}) 主機存活，繼續嘗試 Modbus 連線")
+                    else:
+                        # 主機無回應，代表設備可能已關機或網路完全中斷
+                        main_logger.warning(f"[🔴 Ping 無回應] {machine_id} ({ip}) 主機可能已關機或網路中斷")
+
+            # 等待 5 秒後重試
             time.sleep(5)
-            
+
+    # while 迴圈結束，表示收到停止信號（stop_event 或 stop_flag）
+    # 寫入設備獨立 log 檔：記錄程式關閉時間點
+    log = get_device_logger(ip)
+    log.info(f"[INFO] {machine_id} 🛑 程式關閉，停止監控")
+
+
+
 # =====================================================
 # 設備熱插拔監控
 # =====================================================
