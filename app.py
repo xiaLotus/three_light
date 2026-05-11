@@ -193,12 +193,16 @@ def safe_get_di(di_array, index):
     return di_array[index] if index < len(di_array) else 0
 
 
-def post_dashboard_alarm(machine, state, prev_state=None):
+def post_dashboard_alarm(machine, state, prev_state=None, is_startup=False):
     """
     上拋設備狀態到 Dashboard API
     規則：
       🟢 綠燈：Flag=false → 啟動 | Flag=true → 關閉
       🔴 紅燈：Flag=true  → 啟動 | Flag=false → 關閉
+
+    is_startup=True 時，跳過「舊狀態結束」的請求。
+    原因：程式重啟後 Dashboard 不一定還記得舊狀態，
+         補送一個無效的結束請求反而造成誤判。
     """
     machine_id = machine.get("MachineID", "Unknown")
     alarm_code = machine.get("AlarmCode", {})
@@ -212,10 +216,9 @@ def post_dashboard_alarm(machine, state, prev_state=None):
         action_text 範例：
           🟢啟動綠燈 / 🔴關閉綠燈 / 🔴啟動紅燈 / 🟢關閉紅燈
         """
-        # 根據 color + flag 決定語意標籤
         if color == "GREEN":
             action = "🟢啟動綠燈" if not flag_value else "🔴關閉綠燈"
-        else:  # RED → 統一用「紅燈」取代「警報」
+        else:
             action = "🔴啟動紅燈" if flag_value else "🟢關閉紅燈"
 
         payload = {
@@ -234,9 +237,11 @@ def post_dashboard_alarm(machine, state, prev_state=None):
     # =========================
     # 1️⃣ 舊狀態結束（反轉 Flag）
     # =========================
-    if prev_state is not None:
-        prev_color = "GREEN" if prev_state == "BUSY" else "RED"
-        prev_flag_value = not flag_map.get(prev_color, False)  # 🔹 結束 = 原始值的反
+    # is_startup=True 時略過：程式剛啟動，Dashboard 不一定有舊狀態的紀錄，
+    # 避免送出無效的結束請求造成誤判
+    if prev_state is not None and not is_startup:
+        prev_color      = "GREEN" if prev_state == "BUSY" else "RED"
+        prev_flag_value = not flag_map.get(prev_color, False)  # 結束 = 原始值的反
 
         payload_prev, action_text = build_payload_and_action(prev_color, prev_flag_value)
 
@@ -263,8 +268,8 @@ def post_dashboard_alarm(machine, state, prev_state=None):
     # =========================
     # 2️⃣ 新狀態開始（原始 Flag）
     # =========================
-    color = "GREEN" if state == "BUSY" else "RED"
-    new_flag_value = flag_map.get(color, False)  # 🔹 開始 = 設定值
+    color          = "GREEN" if state == "BUSY" else "RED"
+    new_flag_value = flag_map.get(color, False)  # 開始 = 設定值
 
     payload_new, action_text = build_payload_and_action(color, new_flag_value)
 
@@ -395,22 +400,36 @@ def poll_machine(machine, stop_flag):
     log.info(f"[INFO] {machine_id} 🚀 程式啟動，開始監控 ({ip}:{port})")
 
     # 從持久化檔案恢復上次狀態，避免重開程式後誤觸 Dashboard
-    # 若無歷史紀錄（第一次執行），回傳 None，行為與原始啟動相同
+    # 若無歷史紀錄（第一次執行），回傳 None
     last_state = load_last_state(machine_id)
     main_logger.info(f"[INFO] {machine_id} 上次狀態：{last_state or '(無紀錄，首次啟動)'}")
+
+    # 建立上拋 TV 用的資料模板（提前建立，首次上拋時也需要用到）
+    data_template = {
+        "Plant":     machine.get("Plant", ""),
+        "Site":      machine.get("Site", ""),
+        "MachineID": machine_id
+    }
+
+    # 首次執行（無歷史紀錄）→ 主動上拋 ALARM 作為初始狀態
+    # 原因：設備狀態未知，保守起見先視為異常，等真實狀態讀回後再正確切換
+    if last_state is None:
+        post_state(data_template, "ALARM", ip=ip, machine_id=machine_id)
+        post_dashboard_alarm(machine, "ALARM", prev_state=None, is_startup=True)
+        write_log(ip, machine_id, "ALARM")
+        save_last_state(machine_id, "ALARM")
+        last_state = "ALARM"
+        main_logger.info(f"[INFO] {machine_id} 首次啟動，預設上拋 ALARM")
+
+    # 程式啟動旗標：第一次上拋時為 True，之後自動切換為 False
+    # 用途：通知 post_dashboard_alarm 跳過「舊狀態結束」，避免補送無效請求
+    is_startup = True
 
     # 記錄定時派報已觸發的時間點，避免同一時間點重複上拋
     last_timed_post_key = None
 
     # 記錄第一次斷線的時間，None 表示目前連線正常
     disconnect_time = None
-
-    # 建立上拋 TV 用的資料模板
-    data_template = {
-        "Plant":     machine.get("Plant", ""),
-        "Site":      machine.get("Site", ""),
-        "MachineID": machine_id
-    }
 
     # 外層迴圈：負責斷線重連，只要沒收到停止信號就持續運行
     while not stop_event.is_set() and not stop_flag.is_set():
@@ -483,13 +502,16 @@ def poll_machine(machine, stop_flag):
                             post_state(data_template, state, ip=ip, machine_id=machine_id)
                             # 寫入設備狀態切換的檔案 log
                             write_log(ip, machine_id, state)
-                            # 上拋狀態到 Dashboard（含舊狀態結束 + 新狀態開始）
-                            post_dashboard_alarm(machine, state, prev_state=last_state)
+                            # 上拋狀態到 Dashboard
+                            # is_startup=True 時跳過舊狀態結束，只送新狀態開始
+                            # is_startup=False 時正常送出舊狀態結束 + 新狀態開始
+                            post_dashboard_alarm(machine, state, prev_state=last_state, is_startup=is_startup)
                             # 更新記錄的狀態
                             last_state = state
                             # 同步將最新狀態持久化至檔案
-                            # 確保下次程式啟動或斷線重連後能恢復，不重複觸發 Dashboard
                             save_last_state(machine_id, state)
+                            # 第一次上拋完成後關閉啟動旗標，後續恢復正常雙送邏輯
+                            is_startup = False
 
                         # 取得當下時間
                         now = datetime.now()
@@ -550,7 +572,6 @@ def poll_machine(machine, stop_flag):
     # 寫入設備獨立 log 檔：記錄程式關閉時間點
     log = get_device_logger(ip)
     log.info(f"[INFO] {machine_id} 🛑 程式關閉，停止監控")
-
 
 
 # =====================================================
