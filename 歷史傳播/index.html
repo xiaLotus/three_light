@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>設備監控儀表板</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <style>
+    :root {
+      --navy: #0f1829;
+      --navy-mid: #1a2740;
+      --navy-soft: #243350;
+      --amber: #f59e0b;
+      --amber-light: #fbbf24;
+      --red: #ef4444;
+      --teal: #14b8a6;
+      --sky: #38bdf8;
+      --surface: #f8fafc;
+      --card: #ffffff;
+      --border: #e2e8f0;
+      --text-primary: #0f172a;
+      --text-secondary: #64748b;
+      --text-muted: #94a3b8;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      background: var(--surface);
+      background-image:
+        radial-gradient(ellipse 80% 50% at 50% -20%, rgba(56,189,248,0.08) 0%, transparent 60%);
+      min-height: 100vh;
+      color: var(--text-primary);
+    }
+
+    .mono { font-family: 'IBM Plex Mono', monospace; }
+
+    /* ── Header ── */
+    .site-header {
+      background: linear-gradient(135deg, var(--navy) 0%, var(--navy-mid) 60%, #1e3a5f 100%);
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+      position: sticky; top: 0; z-index: 50;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.25);
+    }
+    .header-inner {
+      max-width: 1400px; margin: 0 auto;
+      padding: 0 2rem;
+      height: 72px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .brand { display: flex; align-items: center; gap: 12px; }
+    .brand-icon {
+      width: 40px; height: 40px; border-radius: 10px;
+      background: linear-gradient(135deg, var(--amber) 0%, #f97316 100%);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px;
+      box-shadow: 0 0 16px rgba(245,158,11,0.4);
+    }
+    .brand-title { color: #fff; font-size: 1.15rem; font-weight: 800; letter-spacing: -0.02em; }
+    .brand-sub { color: rgba(255,255,255,0.4); font-size: 0.72rem; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; margin-top: 1px; }
+    .status-pill {
+      display: flex; align-items: center; gap: 6px;
+      background: rgba(20,184,166,0.15); border: 1px solid rgba(20,184,166,0.3);
+      color: var(--teal); font-size: 0.72rem; font-weight: 600;
+      padding: 4px 12px; border-radius: 999px; letter-spacing: 0.05em;
+    }
+    .pulse-dot {
+      width: 7px; height: 7px; border-radius: 50%;
+      background: var(--teal);
+      animation: pulse-ring 1.8s ease-in-out infinite;
+    }
+    @keyframes pulse-ring {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.5; transform: scale(0.7); }
+    }
+
+    /* ── Main Layout ── */
+    .main-wrap { max-width: 1400px; margin: 0 auto; padding: 2rem; }
+
+    /* ── Filter Bar ── */
+    .filter-bar {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 20px 24px;
+      margin-bottom: 24px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+      display: flex; flex-wrap: wrap; align-items: center; gap: 16px;
+    }
+    .filter-label {
+      font-size: 0.72rem; font-weight: 700; letter-spacing: 0.1em;
+      text-transform: uppercase; color: var(--text-muted);
+    }
+    .preset-group { display: flex; gap: 6px; }
+    .preset-btn {
+      padding: 6px 16px; border-radius: 8px; font-size: 0.8rem; font-weight: 600;
+      border: 1.5px solid var(--border); background: transparent;
+      color: var(--text-secondary); cursor: pointer;
+      transition: all 0.15s;
+    }
+    .preset-btn:hover { border-color: var(--sky); color: #0ea5e9; background: rgba(56,189,248,0.06); }
+    .preset-btn.active {
+      background: var(--navy); color: #fff; border-color: var(--navy);
+      box-shadow: 0 2px 8px rgba(15,24,41,0.2);
+    }
+    .date-range-group {
+      display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+    }
+    .date-input {
+      padding: 7px 12px; border: 1.5px solid var(--border); border-radius: 8px;
+      font-size: 0.8rem; font-family: 'IBM Plex Mono', monospace;
+      color: var(--text-primary); background: var(--surface);
+      outline: none; transition: border-color 0.15s;
+    }
+    .date-input:focus { border-color: var(--sky); background: #fff; }
+    .date-sep { color: var(--text-muted); font-size: 0.85rem; }
+    .refresh-btn {
+      margin-left: auto;
+      display: flex; align-items: center; gap: 8px;
+      padding: 8px 20px; border-radius: 10px;
+      background: linear-gradient(135deg, #0f1829, #243350);
+      color: #fff; font-size: 0.82rem; font-weight: 700;
+      border: none; cursor: pointer;
+      box-shadow: 0 2px 8px rgba(15,24,41,0.25);
+      transition: all 0.15s; letter-spacing: 0.02em;
+    }
+    .refresh-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 16px rgba(15,24,41,0.35); }
+    .refresh-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+    .spin { animation: spin 0.9s linear infinite; display: inline-block; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Stats Row ── */
+    .stats-row {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 14px; margin-bottom: 24px;
+    }
+    .stat-card {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 14px; padding: 18px 20px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+      position: relative; overflow: hidden;
+      transition: transform 0.15s, box-shadow 0.15s;
+    }
+    .stat-card:hover { transform: translateY(-2px); box-shadow: 0 4px 16px rgba(0,0,0,0.08); }
+    .stat-card::before {
+      content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+    }
+    .stat-card.blue::before { background: linear-gradient(90deg, #38bdf8, #818cf8); }
+    .stat-card.amber::before { background: linear-gradient(90deg, #f59e0b, #f97316); }
+    .stat-card.red::before { background: linear-gradient(90deg, #ef4444, #ec4899); }
+    .stat-card.teal::before { background: linear-gradient(90deg, #14b8a6, #22d3ee); }
+    .stat-icon { font-size: 1.6rem; margin-bottom: 8px; }
+    .stat-value {
+      font-size: 2rem; font-weight: 800; letter-spacing: -0.04em;
+      font-family: 'IBM Plex Mono', monospace; line-height: 1;
+    }
+    .stat-value.blue { color: #0ea5e9; }
+    .stat-value.amber { color: var(--amber); }
+    .stat-value.red { color: var(--red); }
+    .stat-value.teal { color: var(--teal); }
+    .stat-label { font-size: 0.75rem; font-weight: 600; color: var(--text-muted); margin-top: 4px; letter-spacing: 0.04em; text-transform: uppercase; }
+
+    /* ── Group Card ── */
+    .group-card {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 16px; overflow: hidden; margin-bottom: 20px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+      transition: box-shadow 0.2s;
+    }
+    .group-card:hover { box-shadow: 0 4px 20px rgba(0,0,0,0.1); }
+    .group-header {
+      background: linear-gradient(135deg, var(--navy) 0%, var(--navy-mid) 100%);
+      padding: 16px 22px;
+      display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px;
+      cursor: pointer;
+      user-select: none;
+      transition: background 0.15s;
+    }
+    .group-header:hover {
+      background: linear-gradient(135deg, #1a2e4a 0%, #243a5e 100%);
+    }
+    .group-header:active { background: linear-gradient(135deg, #0d1e36 0%, #1a2e4a 100%); }
+    .group-title { color: #fff; font-size: 1rem; font-weight: 700; display: flex; align-items: center; gap: 10px; }
+    .group-location { color: rgba(255,255,255,0.5); font-weight: 400; }
+    .group-site { color: var(--amber-light); }
+    .count-badge {
+      background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.15);
+      color: rgba(255,255,255,0.7); font-size: 0.7rem; font-weight: 600;
+      padding: 3px 10px; border-radius: 999px;
+    }
+    .anomaly-badges { display: flex; gap: 8px; }
+    .badge-transport {
+      display: flex; align-items: center; gap: 5px;
+      background: rgba(239,68,68,0.2); border: 1px solid rgba(239,68,68,0.4);
+      color: #fca5a5; font-size: 0.72rem; font-weight: 700;
+      padding: 4px 12px; border-radius: 999px;
+    }
+    .badge-bake {
+      display: flex; align-items: center; gap: 5px;
+      background: rgba(245,158,11,0.2); border: 1px solid rgba(245,158,11,0.4);
+      color: #fcd34d; font-size: 0.72rem; font-weight: 700;
+      padding: 4px 12px; border-radius: 999px;
+    }
+
+    /* ── Chart Section ── */
+    .chart-section {
+      padding: 20px 22px;
+      border-bottom: 1px solid var(--border);
+      background: linear-gradient(180deg, #f8fafc 0%, #fff 100%);
+    }
+    .chart-header {
+      display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px;
+    }
+    .chart-title { font-size: 0.8rem; font-weight: 700; color: var(--text-secondary); letter-spacing: 0.06em; text-transform: uppercase; }
+    .chart-hint { font-size: 0.7rem; color: var(--text-muted); background: #f1f5f9; padding: 3px 8px; border-radius: 6px; }
+    .chart-wrap { height: 160px; }
+
+    /* ── Table ── */
+    .detail-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+    .detail-table thead tr {
+      background: #f8fafc;
+    }
+    .detail-table th {
+      padding: 10px 16px; text-align: left;
+      font-size: 0.68rem; font-weight: 700; letter-spacing: 0.08em;
+      text-transform: uppercase; color: var(--text-muted);
+      border-bottom: 1px solid var(--border);
+    }
+    .detail-table td {
+      padding: 11px 16px;
+      border-bottom: 1px solid #f1f5f9;
+      vertical-align: top;
+    }
+    .detail-table tr:last-child td { border-bottom: none; }
+    .detail-table tbody tr { transition: background 0.1s; }
+    .detail-table tbody tr:hover { background: #f8fbff; }
+    .id-cell { font-family: 'IBM Plex Mono', monospace; font-size: 0.75rem; color: var(--text-muted); }
+    .count-red { color: var(--red); font-weight: 700; }
+    .count-amber { color: var(--amber); font-weight: 700; }
+    .count-zero { color: #cbd5e1; }
+    .time-cell { font-family: 'IBM Plex Mono', monospace; font-size: 0.72rem; color: var(--text-muted); white-space: nowrap; }
+    .content-cell { font-size: 0.78rem; color: #475569; line-height: 1.6; max-width: 220px; }
+
+    /* ── Loading / Empty ── */
+    .loading-wrap {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      padding: 80px 20px; gap: 16px;
+    }
+    .loading-spinner {
+      width: 44px; height: 44px; border-radius: 50%;
+      border: 3px solid var(--border);
+      border-top-color: var(--sky);
+      animation: spin 0.8s linear infinite;
+    }
+    .loading-text { color: var(--text-muted); font-size: 0.9rem; font-weight: 500; }
+    .empty-wrap {
+      text-align: center; padding: 80px 20px;
+      color: var(--text-muted);
+      background: var(--card); border: 1px dashed var(--border);
+      border-radius: 16px;
+    }
+    .empty-icon { font-size: 3rem; margin-bottom: 12px; }
+    .empty-text { font-size: 0.95rem; font-weight: 600; }
+    .error-box {
+      background: #fef2f2; border: 1px solid #fecaca;
+      border-radius: 14px; padding: 20px 24px;
+      color: #b91c1c; font-weight: 600; font-size: 0.9rem;
+    }
+
+    /* ── Expand / Collapse Bar ── */
+    .expand-bar {
+      display: flex; align-items: center; justify-content: center;
+      padding: 12px 20px;
+      border-top: 1px solid var(--border);
+      cursor: pointer;
+      background: #f8fafc;
+      transition: background 0.15s;
+      user-select: none;
+    }
+    .expand-bar:hover { background: #eef4ff; }
+    .expand-bar:active { background: #e0edff; }
+    .expand-inner {
+      display: flex; align-items: center; gap: 7px;
+      font-size: 0.78rem; font-weight: 700;
+      color: #475569; letter-spacing: 0.02em;
+    }
+    .expand-icon {
+      font-size: 0.6rem; color: #94a3b8;
+      transition: transform 0.25s ease;
+      display: inline-block;
+    }
+    .expand-icon.rotated { transform: rotate(180deg); }
+    .expand-more {
+      font-weight: 500; color: #94a3b8;
+    }
+
+    /* ── Card collapse button ── */
+    .card-collapse-icon {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 28px; height: 28px; border-radius: 8px;
+      background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15);
+      color: rgba(255,255,255,0.8); font-size: 0.95rem;
+      flex-shrink: 0;
+      transition: transform 0.3s ease, background 0.15s;
+      transform: rotate(0deg);
+    }
+    .group-header:hover .card-collapse-icon { background: rgba(255,255,255,0.18); }
+    .card-collapse-icon.collapsed { transform: rotate(180deg); }
+
+    /* ── Card body collapse ── */
+    .card-body {
+      overflow: hidden;
+      max-height: 4000px;
+      transition: max-height 0.4s ease, opacity 0.25s ease;
+      opacity: 1;
+    }
+    .card-body-hidden {
+      max-height: 0 !important;
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    /* ── Loading overlay ── */
+    .loading-overlay {
+      position: fixed; inset: 0; z-index: 100;
+      display: flex; align-items: center; justify-content: center;
+      background: rgba(248,250,252,0.78);
+      backdrop-filter: blur(6px);
+    }
+    .loading-box {
+      display: flex; flex-direction: column; align-items: center; gap: 16px;
+      background: #fff; border: 1px solid var(--border);
+      border-radius: 20px; padding: 44px 60px;
+      box-shadow: 0 8px 48px rgba(0,0,0,0.13);
+    }
+
+    .range-info {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 0.75rem; color: var(--text-muted);
+      background: #f1f5f9; padding: 5px 12px; border-radius: 8px;
+      font-family: 'IBM Plex Mono', monospace;
+    }
+    .range-dot { width: 6px; height: 6px; background: var(--teal); border-radius: 50%; }
+  </style>
+</head>
+<body>
+
+  <!-- Header -->
+  <header class="site-header">
+    <div class="header-inner">
+      <div class="brand">
+        <div class="brand-icon">🏭</div>
+        <div>
+          <div class="brand-title">設備監控儀表板</div>
+          <div class="brand-sub">Equipment Monitoring Dashboard</div>
+        </div>
+      </div>
+      <div class="status-pill">
+        <span class="pulse-dot"></span>
+        即時監控中
+      </div>
+    </div>
+  </header>
+
+  <div id="app">
+    <div class="main-wrap">
+
+      <!-- Filter Bar -->
+      <div class="filter-bar">
+        <span class="filter-label">時間篩選</span>
+
+        <div class="preset-group">
+          <button class="preset-btn" :class="{ active: activePreset === 'today' }" @click="setPreset('today')">今天</button>
+          <button class="preset-btn" :class="{ active: activePreset === '3d' }" @click="setPreset('3d')">近 3 天</button>
+          <button class="preset-btn" :class="{ active: activePreset === '7d' }" @click="setPreset('7d')">近 7 天</button>
+          <button class="preset-btn" :class="{ active: activePreset === 'custom' }" @click="setPreset('custom')">自訂</button>
+        </div>
+
+        <div class="date-range-group">
+          <input type="date" class="date-input" v-model="filterStart" :max="maxDate" @change="onStartDateChange" />
+          <span class="date-sep">→</span>
+          <input type="date" class="date-input" v-model="filterEnd" :min="filterStart || ''" :max="maxDate" @change="onEndDateChange" />
+        </div>
+
+        <div class="range-info" v-if="filterStart && filterEnd">
+          <span class="range-dot"></span>
+          {{ filterStart }} ～ {{ filterEnd }}
+          （{{ filteredCount }} 筆）
+        </div>
+
+        <button class="refresh-btn" @click="fetchData" :disabled="loading">
+          <span :class="loading ? 'spin' : ''">↻</span>
+          {{ loading ? '同步中...' : '重新整理' }}
+        </button>
+      </div>
+
+      <!-- Loading overlay (fixed center) -->
+      <div v-if="loading" class="loading-overlay">
+        <div class="loading-box">
+          <div class="loading-spinner"></div>
+          <div class="loading-text">資料同步中，請稍候...</div>
+        </div>
+      </div>
+
+      <!-- Error -->
+      <div class="error-box" v-else-if="error">
+        ❌ 載入失敗：{{ error }}
+      </div>
+
+      <!-- Group Cards -->
+      <template v-else-if="groupedAlerts.length > 0">
+        <div class="group-card" v-for="group in groupedAlerts" :key="group.key">
+
+          <!-- Card Header (點擊整列收合) -->
+          <div class="group-header" @click="toggleCard(group.key)" :class="{ 'header-collapsed': isCollapsed(group.key) }">
+            <div class="group-title">
+              <span>📍</span>
+              <span>
+                <span class="group-location">{{ group.棟別 }} {{ group.樓層 }}</span>
+                <span style="color:rgba(255,255,255,0.3);margin:0 8px;">|</span>
+                <span class="group-site">站點 {{ group.站點 }}</span>
+              </span>
+              <span class="count-badge">{{ group.items.length }} 筆</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;">
+              <div class="anomaly-badges">
+                <span class="badge-transport" v-if="group.搬運異常總計 > 0">🚚 {{ group.搬運異常總計 }} 台</span>
+                <span class="badge-bake" v-if="group.烘烤異常總計 > 0">🔥 {{ group.烘烤異常總計 }} 台</span>
+              </div>
+              <!-- 收合指示箭頭 -->
+              <span class="card-collapse-icon" :class="{ collapsed: isCollapsed(group.key) }">⌃</span>
+            </div>
+          </div>
+
+          <!-- 可收合區塊 -->
+          <div class="card-body" :class="{ 'card-body-hidden': isCollapsed(group.key) }">
+
+          <!-- Chart -->
+          <div class="chart-section">
+            <div class="chart-header">
+              <span class="chart-title">📈 每日上拋趨勢</span>
+              <span class="chart-hint">篩選區間內，每筆 = 1 次</span>
+            </div>
+            <div class="chart-wrap">
+              <canvas :id="getChartId(group)"></canvas>
+            </div>
+          </div>
+
+          <!-- Detail Table -->
+          <div style="overflow-x:auto">
+            <table class="detail-table">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>搬運未啟動</th>
+                  <th>搬運明細</th>
+                  <th>烘烤超時</th>
+                  <th>烘烤明細</th>
+                  <th>時間</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="row in visibleItems(group)" :key="row.id">
+                  <td class="id-cell">#{{ row.id }}</td>
+                  <td>
+                    <span :class="row['搬運未啟動台數'] > 0 ? 'count-red' : 'count-zero'">
+                      {{ row['搬運未啟動台數'] }} 台
+                    </span>
+                  </td>
+                  <td class="content-cell" v-html="formatContent(row['搬運輸出內文'])"></td>
+                  <td>
+                    <span :class="row['烘烤超時台數'] > 0 ? 'count-amber' : 'count-zero'">
+                      {{ row['烘烤超時台數'] }} 台
+                    </span>
+                  </td>
+                  <td class="content-cell" v-html="formatContent(row['烘烤超時內文'])"></td>
+                  <td class="time-cell">{{ row.created_at }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- 展開 / 收合按鈕 -->
+          <div v-if="group.items.length > PREVIEW_ROWS" class="expand-bar" @click="toggleExpand(group.key)">
+            <span class="expand-inner">
+              <span class="expand-icon" :class="{ rotated: isExpanded(group.key) }">▼</span>
+              <span v-if="!isExpanded(group.key)">
+                展開全部 {{ group.items.length }} 筆
+                <span class="expand-more">（還有 {{ group.items.length - PREVIEW_ROWS }} 筆）</span>
+              </span>
+              <span v-else>收合列表</span>
+            </span>
+          </div>
+
+          </div><!-- /.card-body -->
+
+        </div>
+      </template>
+
+      <!-- Empty -->
+      <div class="empty-wrap" v-else>
+        <div class="empty-icon">📭</div>
+        <div class="empty-text">此區間無異常紀錄</div>
+      </div>
+
+    </div>
+  </div>
+
+  <script src="./app.js"></script>
+</body>
+</html>
