@@ -23,6 +23,15 @@ const app = Vue.createApp({
     },
     
     computed: {
+        // ✅ 今日日期字串，供 date input 的 max 屬性使用
+        todayStr() {
+            const d = new Date();
+            const yyyy = d.getFullYear();
+            const mm = String(d.getMonth() + 1).padStart(2, '0');
+            const dd = String(d.getDate()).padStart(2, '0');
+            return `${yyyy}-${mm}-${dd}`;
+        },
+
         chartStations() {
             return [...new Set(this.filteredTimelineData.map(d => d.station))];
         },
@@ -138,6 +147,10 @@ const app = Vue.createApp({
         async fetchFilters() {
             try {
                 const response = await fetch('http://127.0.0.1:5000/api/filters');
+                // ✅ 先檢查狀態碼，避免 500 回傳 HTML 時 JSON.parse 爆炸
+                if (!response.ok) {
+                    throw new Error(`伺服器錯誤 ${response.status}，請確認 Flask 是否正常運行`);
+                }
                 const data = await response.json();
                 
                 this.availableBuildings = data.buildings;
@@ -225,7 +238,7 @@ const app = Vue.createApp({
 
             this.selectedProcessCode = (this.selectedProcessCode === code) ? null : code;
             this.calculateStats();
-            this.renderChart();   // debounce 內部處理，重複呼叫安全
+            // ✅ 時序圖由 Vue 響應式自動重繪，不需要手動呼叫 renderChart()
         },
         
         onLocationChange() {
@@ -269,8 +282,7 @@ const app = Vue.createApp({
                 this.calculateStats();
                 
                 this.loading = false;
-                await this.$nextTick();   // 等 Vue 把 v-if 的 DOM 渲染出來
-                this.renderChart();
+                // ✅ timelineData 更新後 Vue 自動重繪時序圖，不需要 renderChart()
                 
                 // 隱藏中間載入動畫
                 setTimeout(() => {
@@ -302,6 +314,24 @@ const app = Vue.createApp({
         applyCustomRange() {
             if (!this.customStartDate || !this.customEndDate) {
                 alert('請選擇完整的日期範圍');
+                return;
+            }
+
+            // ✅ 任一日期不得超過今日
+            if (this.customStartDate > this.todayStr) {
+                alert('開始日期不得超過今日');
+                this.customStartDate = this.todayStr;
+                return;
+            }
+            if (this.customEndDate > this.todayStr) {
+                alert('結束日期不得超過今日');
+                this.customEndDate = this.todayStr;
+                return;
+            }
+
+            // ✅ 開始日期不得晚於結束日期
+            if (this.customStartDate > this.customEndDate) {
+                alert('開始日期不得晚於結束日期');
                 return;
             }
             
@@ -340,14 +370,20 @@ const app = Vue.createApp({
                 const now = new Date();
                 return new Date(now.getTime() - this.filterRange.days * 24 * 60 * 60 * 1000);
             } else if (this.filterRange.start) {
-                return new Date(this.filterRange.start);
+                // ✅ 補 T00:00:00 強制以本地時間解析，避免純日期字串被當 UTC（台灣差 8 小時）
+                return new Date(this.filterRange.start + 'T00:00:00');
+            }
+            // ✅ 「全部」模式（days=null）：用資料中最早的時間，避免退化成 epoch(0)
+            if (this.timelineData.length > 0) {
+                return new Date(Math.min(...this.timelineData.map(d => new Date(d.start + (d.start.includes('T') ? '' : 'T00:00:00')).getTime())));
             }
             return null;
         },
         
         getChartMaxTime() {
             if (this.filterRange.end) {
-                return new Date(this.filterRange.end);
+                // ✅ 補 T23:59:59 = 本地時間該天最後一秒，原本 "2025-06-20" 會被解析成 UTC 午夜（台灣 08:00），整個最後一天都被截掉
+                return new Date(this.filterRange.end + 'T23:59:59');
             }
             return new Date();
         },

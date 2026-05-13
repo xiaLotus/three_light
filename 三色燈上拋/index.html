@@ -559,8 +559,8 @@
                     <!-- 自訂日期 -->
                     <div class="border-t border-white/20 pt-4">
                         <div class="text-sm mb-2 opacity-80">自訂日期範圍：</div>
-                        <input type="date" v-model="customStartDate" class="custom-input" placeholder="開始日期">
-                        <input type="date" v-model="customEndDate" class="custom-input" placeholder="結束日期">
+                        <input type="date" v-model="customStartDate" :max="todayStr" class="custom-input" placeholder="開始日期">
+                        <input type="date" v-model="customEndDate" :max="todayStr" class="custom-input" placeholder="結束日期">
                         <button @click="applyCustomRange" class="action-btn">
                             🔍 查詢
                         </button>

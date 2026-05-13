@@ -8,7 +8,7 @@ import os
 import sys
 
 app = Flask(__name__)
-CORS(app)
+CORS(app, origins="*")
 
 # Loguru 設定
 # ===============================
@@ -50,7 +50,7 @@ engine = create_engine(
 @app.route('/api/filters')
 def get_filters():
     """獲取可用的 building 和 floor 列表"""
-    df = pd.read_csv('machine_status.csv')
+    df = pd.read_csv('三色燈上拋資訊.csv')
     sql = """
         SELECT *
         FROM machine_status
@@ -76,11 +76,11 @@ def get_filters():
 def get_timeline_data():
     # 讀取 CSV
     logger.info("📥 收到 /api/timeline-data 請求")
-    df_all = pd.read_csv('machine_status.csv')
-    sql = """
-            SELECT *
-            FROM machine_status
-    """
+    df_all = pd.read_csv('三色燈上拋資訊.csv')
+    # sql = """
+    #         SELECT *
+    #         FROM machine_status
+    # """
     # df_all = pd.read_sql(sql, engine)
 
     logger.info(f"📊 DB 撈取筆數: {len(df_all)}")
