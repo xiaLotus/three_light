@@ -6,759 +6,795 @@
     <title>設備狀態時序圖</title>
     <script src="static/js/tailwinds.js"></script>
     <script src="static/js/vue.global.js"></script>
-    <script src="static/js/chart.umd.min.js"></script>
-    <script src="static/js/chartjs-adapter-date-fns.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
+        :root {
+            --sidebar-w: 280px;
+            --c-blue:  #0ea5e9;
+            --c-cyan:  #06b6d4;
+            --c-glow:  rgba(14,165,233,0.6);
+            --c-bg:    #020408;
+            --c-panel: #080d14;
         }
-        
-        html, body {
-            height: 100%;
-            overflow: hidden;
-            background: #000000;
+        * { margin:0; padding:0; box-sizing:border-box; }
+        html,body { height:100%; overflow:hidden; background:var(--c-bg); }
+
+        #app { opacity:0; transition:opacity 0.7s ease; }
+        #app.show { opacity:1; }
+
+        /* ════════════════════════════════════════════════════
+           INITIAL LOADING  ── 工業控制台風格
+        ════════════════════════════════════════════════════ */
+        .loading-screen {
+            position:fixed; inset:0; z-index:9999;
+            background:var(--c-bg);
+            display:flex; flex-direction:column;
+            align-items:center; justify-content:center;
+            opacity:1; transition:opacity 0.7s ease-out;
+            overflow:hidden;
+            font-family:'Rajdhani',sans-serif;
+        }
+        .loading-screen.fade-out { opacity:0; pointer-events:none; }
+
+        /* 六角格背景 */
+        .ls-grid {
+            position:absolute; inset:0;
+            background-image:
+                linear-gradient(rgba(14,165,233,0.04) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(14,165,233,0.04) 1px, transparent 1px);
+            background-size:48px 48px;
+            mask-image:radial-gradient(ellipse 80% 80% at 50% 50%, black 30%, transparent 100%);
+            animation:lsGridPulse 4s ease-in-out infinite;
+        }
+        @keyframes lsGridPulse { 0%,100%{opacity:.5} 50%{opacity:1} }
+
+        /* 角落裝飾線 */
+        .ls-corner { position:absolute; width:60px; height:60px; }
+        .ls-corner::before,.ls-corner::after { content:''; position:absolute; background:var(--c-blue); }
+        .ls-corner::before { width:100%; height:2px; top:0; left:0; }
+        .ls-corner::after  { width:2px; height:100%; top:0; left:0; }
+        .ls-corner.tl { top:24px; left:24px; }
+        .ls-corner.tr { top:24px; right:24px; transform:scaleX(-1); }
+        .ls-corner.bl { bottom:24px; left:24px; transform:scaleY(-1); }
+        .ls-corner.br { bottom:24px; right:24px; transform:scale(-1); }
+
+        /* 掃描橫線 */
+        .ls-scanbeam {
+            position:absolute; left:0; right:0; height:2px;
+            background:linear-gradient(90deg, transparent 0%, var(--c-cyan) 20%, rgba(6,182,212,0.8) 50%, var(--c-cyan) 80%, transparent 100%);
+            box-shadow:0 0 20px 4px rgba(6,182,212,0.4);
+            animation:lsScan 3s ease-in-out infinite;
+            top:0;
+        }
+        @keyframes lsScan {
+            0%   { top:-4px; opacity:0; }
+            10%  { opacity:1; }
+            90%  { opacity:1; }
+            100% { top:100%; opacity:0; }
         }
 
-        /* 初始隱藏主內容，避免閃爍 */
-        #app {
-            opacity: 0;
-            transition: opacity 0.5s ease-in;
+        /* 主環組 */
+        .ls-rings {
+            position:relative; width:220px; height:220px;
+            display:flex; align-items:center; justify-content:center;
+            margin-bottom:40px; flex-shrink:0;
         }
 
-        #app.show {
-            opacity: 1;
+        /* 外發光暈 */
+        .ls-glow {
+            position:absolute; inset:-20px; border-radius:50%;
+            background:radial-gradient(circle, rgba(14,165,233,0.12) 0%, transparent 70%);
+            animation:lsPulseGlow 2s ease-in-out infinite;
         }
-        
+        @keyframes lsPulseGlow { 0%,100%{transform:scale(1);opacity:.7} 50%{transform:scale(1.1);opacity:1} }
+
+        .ls-ring {
+            position:absolute; border-radius:50%;
+            border:1.5px solid transparent;
+        }
+        /* 環1：藍色主環 */
+        .ls-ring-1 {
+            inset:0;
+            border-color:rgba(14,165,233,0.8) transparent rgba(14,165,233,0.3) transparent;
+            box-shadow:0 0 12px rgba(14,165,233,0.4), inset 0 0 12px rgba(14,165,233,0.1);
+            animation:lsR1 2s linear infinite;
+        }
+        /* 環2：青色反轉 */
+        .ls-ring-2 {
+            inset:22px;
+            border-color:transparent rgba(6,182,212,0.9) transparent rgba(6,182,212,0.3);
+            animation:lsR1 1.4s linear infinite reverse;
+        }
+        /* 環3：細虛線 */
+        .ls-ring-3 {
+            inset:44px;
+            border:1px dashed rgba(14,165,233,0.35);
+            animation:lsR1 4s linear infinite;
+        }
+        /* 環4：最內實心 */
+        .ls-ring-4 {
+            inset:64px;
+            border-color:rgba(14,165,233,0.6) transparent rgba(6,182,212,0.6) transparent;
+            animation:lsR1 1s linear infinite reverse;
+        }
+        @keyframes lsR1 { to{transform:rotate(360deg)} }
+
+        /* 中心核心 */
+        .ls-core {
+            position:absolute; inset:86px; border-radius:50%;
+            background:radial-gradient(circle, rgba(14,165,233,0.9) 0%, rgba(6,182,212,0.4) 50%, transparent 70%);
+            box-shadow:0 0 20px 6px rgba(14,165,233,0.6);
+            animation:lsCorePulse 1.5s ease-in-out infinite;
+        }
+        @keyframes lsCorePulse {
+            0%,100%{transform:scale(1);opacity:.9}
+            50%{transform:scale(1.15);opacity:1}
+        }
+
+        /* 繞行小點 */
+        .ls-orbit {
+            position:absolute; inset:0;
+            animation:lsR1 2.5s linear infinite;
+        }
+        .ls-orbit::before {
+            content:''; position:absolute;
+            width:8px; height:8px; border-radius:50%;
+            background:var(--c-blue);
+            box-shadow:0 0 10px 3px rgba(14,165,233,0.8);
+            top:6px; left:50%; transform:translateX(-50%);
+        }
+        .ls-orbit-2 {
+            position:absolute; inset:22px;
+            animation:lsR1 1.8s linear infinite reverse;
+        }
+        .ls-orbit-2::before {
+            content:''; position:absolute;
+            width:6px; height:6px; border-radius:50%;
+            background:var(--c-cyan);
+            box-shadow:0 0 8px 2px rgba(6,182,212,0.8);
+            bottom:2px; left:50%; transform:translateX(-50%);
+        }
+
+        /* 文字區 */
+        .ls-text { text-align:center; position:relative; z-index:2; }
+        .ls-title {
+            font-family:'Rajdhani',sans-serif;
+            font-size:1.8rem; font-weight:700; letter-spacing:6px;
+            color:#fff; text-transform:uppercase;
+            text-shadow:0 0 20px rgba(14,165,233,0.8);
+            margin-bottom:6px;
+        }
+        .ls-subtitle {
+            font-family:'Share Tech Mono',monospace;
+            font-size:0.72rem; letter-spacing:3px;
+            color:rgba(14,165,233,0.7);
+            margin-bottom:24px;
+        }
+
+        /* 底部進度條 */
+        .ls-progress {
+            width:260px; height:2px;
+            background:rgba(14,165,233,0.12);
+            border-radius:2px; overflow:hidden;
+            margin:0 auto 12px;
+        }
+        .ls-progress-fill {
+            height:100%;
+            background:linear-gradient(90deg, var(--c-blue), var(--c-cyan));
+            box-shadow:0 0 8px var(--c-glow);
+            animation:lsProgressFill 2.5s ease-in-out infinite;
+        }
+        @keyframes lsProgressFill {
+            0%   {width:0%;   margin-left:0%}
+            45%  {width:75%;  margin-left:0%}
+            55%  {width:75%;  margin-left:25%}
+            100% {width:0%;   margin-left:100%}
+        }
+        .ls-status {
+            font-family:'Share Tech Mono',monospace;
+            font-size:0.68rem; color:rgba(14,165,233,0.5);
+            letter-spacing:2px;
+            animation:lsFade 2s ease-in-out infinite;
+        }
+        @keyframes lsFade { 0%,100%{opacity:.4} 50%{opacity:1} }
+
+        /* 側邊數據流 */
+        .ls-datastream {
+            position:absolute; top:50%; transform:translateY(-50%);
+            font-family:'Share Tech Mono',monospace;
+            font-size:0.6rem; color:rgba(14,165,233,0.2);
+            line-height:1.8; letter-spacing:1px;
+            animation:lsFade 3s ease-in-out infinite;
+        }
+        .ls-datastream.left  { left:32px; text-align:left; animation-delay:.5s; }
+        .ls-datastream.right { right:32px; text-align:right; animation-delay:1s; }
+
+
+        /* ════════════════════════════════════════════════════
+           SEARCH LOADING OVERLAY
+        ════════════════════════════════════════════════════ */
+        .center-loading {
+            position:fixed;
+            left:var(--sidebar-w); top:0; right:0; bottom:0;
+            background:rgba(2,4,8,0.88);
+            backdrop-filter:blur(16px);
+            display:flex; flex-direction:column;
+            align-items:center; justify-content:center;
+            z-index:999;
+            opacity:0; pointer-events:none;
+            transition:opacity 0.25s ease;
+            font-family:'Rajdhani',sans-serif;
+        }
+        .center-loading.active { opacity:1; pointer-events:all; }
+
+        /* 頂部光束進度條 */
+        .cl-topbar {
+            position:absolute; top:0; left:0; right:0; height:3px;
+            background:rgba(14,165,233,0.08); overflow:hidden;
+        }
+        .cl-progress-bar {
+            height:100%;
+            background:linear-gradient(90deg, transparent, var(--c-blue), var(--c-cyan), var(--c-blue), transparent);
+            animation:clBar 1.4s ease-in-out infinite;
+        }
+        @keyframes clBar {
+            0%  {width:0%;  margin-left:0%}
+            45% {width:70%; margin-left:0%}
+            55% {width:70%; margin-left:30%}
+            100%{width:0%;  margin-left:100%}
+        }
+
+        /* 雙環 + 雷達掃描 */
+        .cl-radar-wrap {
+            position:relative; width:110px; height:110px;
+            margin-bottom:28px;
+        }
+        .cl-ring {
+            position:absolute; border-radius:50%;
+            border:1.5px solid transparent;
+        }
+        .cl-ring-1 {
+            inset:0;
+            border-color:rgba(14,165,233,0.7) transparent rgba(14,165,233,0.2) transparent;
+            animation:lsR1 1.6s linear infinite;
+            box-shadow:0 0 10px rgba(14,165,233,0.3);
+        }
+        .cl-ring-2 {
+            inset:18px;
+            border-color:transparent rgba(6,182,212,0.8) transparent rgba(6,182,212,0.2);
+            animation:lsR1 1.1s linear infinite reverse;
+        }
+        .cl-sweep {
+            position:absolute; inset:0; border-radius:50%;
+            background:conic-gradient(
+                from 0deg,
+                transparent 0deg,
+                transparent 255deg,
+                rgba(14,165,233,0.5) 310deg,
+                rgba(6,182,212,0.9)  360deg
+            );
+            animation:lsR1 1.6s linear infinite;
+        }
+        .cl-core {
+            position:absolute; inset:48px; border-radius:50%;
+            background:radial-gradient(circle, rgba(14,165,233,0.9), rgba(6,182,212,0.4), transparent);
+            box-shadow:0 0 14px 4px rgba(14,165,233,0.5);
+            animation:lsCorePulse 1.6s ease-in-out infinite;
+        }
+
+        /* 文字 */
+        .cl-label {
+            font-size:1.1rem; font-weight:700; letter-spacing:4px;
+            color:#fff; text-shadow:0 0 12px rgba(14,165,233,0.6);
+            margin-bottom:6px; text-transform:uppercase;
+        }
+        .cl-status {
+            font-family:'Share Tech Mono',monospace;
+            font-size:0.72rem; letter-spacing:2px;
+            color:rgba(14,165,233,0.55);
+            animation:lsFade 1.8s ease-in-out infinite;
+        }
+
+        /* ════════════════════════════════════════════════════
+           搜尋計時器 — position:fixed，不隨頁面滾動
+        ════════════════════════════════════════════════════ */
+        /* 計時器：底部固定橫條，不隨滾動移動 */
+        .search-timer {
+            position:fixed;
+            left:var(--sidebar-w); right:0; bottom:0;
+            height:36px;
+            background:rgba(6,10,18,0.97);
+            border-top:1px solid rgba(14,165,233,0.2);
+            display:flex; align-items:center; justify-content:center; gap:10px;
+            z-index:10000;
+            backdrop-filter:blur(10px);
+            font-family:'Share Tech Mono',monospace;
+            font-size:0.8rem; letter-spacing:2px;
+            color:rgba(255,255,255,0.7);
+            transition:left 0.32s cubic-bezier(.4,0,.2,1);
+        }
+        .search-timer.sidebar-collapsed { left:0; }
+        .timer-dot {
+            width:7px; height:7px; border-radius:50%;
+            background:var(--c-blue);
+            box-shadow:0 0 8px var(--c-glow);
+            animation:timerPulse 1s ease-in-out infinite;
+            flex-shrink:0;
+        }
+        .timer-dot.done {
+            background:#22c55e;
+            box-shadow:0 0 8px rgba(34,197,94,0.5);
+            animation:none;
+        }
+        @keyframes timerPulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.4;transform:scale(.75)} }
+
+        /* ════════════════════════════════════════════════════
+           SIDEBAR
+        ════════════════════════════════════════════════════ */
+        .sidebar-wrapper {
+            position:fixed; left:0; top:0; bottom:0;
+            width:var(--sidebar-w); z-index:100;
+            transition:transform 0.32s cubic-bezier(.4,0,.2,1);
+        }
+        .sidebar-wrapper.collapsed { transform:translateX(calc(-1 * var(--sidebar-w))); }
+
         .sidebar {
-            width: 320px;
-            height: 100vh;
-            position: fixed;
-            left: 0;
-            top: 0;
-            background: linear-gradient(180deg, #1a1a1a 0%, #0a0a0a 100%);
-            color: white;
-            overflow-y: auto;
-            box-shadow: 4px 0 20px rgba(0, 0, 0, 0.5);
-            z-index: 100;
+            width:100%; height:100%;
+            background:var(--c-panel);
+            border-right:1px solid rgba(14,165,233,0.1);
+            display:flex; flex-direction:column; overflow:hidden;
         }
-        
-        .main-content {
-            margin-left: 320px;
-            height: 100vh;
-            overflow-y: auto;
-            background: #000000;
+
+        /* 收合按鈕 */
+        .sidebar-toggle {
+            position:fixed;
+            top:50%; transform:translateY(-50%);
+            width:20px; height:52px;
+            background:var(--c-panel);
+            border:1px solid rgba(14,165,233,0.18);
+            border-left:none; border-radius:0 8px 8px 0;
+            cursor:pointer;
+            display:flex; align-items:center; justify-content:center;
+            z-index:101;
+            transition:left 0.32s cubic-bezier(.4,0,.2,1), background 0.2s;
+            color:rgba(14,165,233,0.5); font-size:9px;
         }
-        
+        .sidebar-toggle:hover { background:#0d1420; color:var(--c-blue); }
+
+        /* sidebar header */
+        .sidebar-header {
+            padding:18px 16px 14px;
+            border-bottom:1px solid rgba(14,165,233,0.08);
+            flex-shrink:0;
+        }
+        .sidebar-header h1 {
+            font-family:'Rajdhani',sans-serif;
+            font-size:1rem; font-weight:700; letter-spacing:2px;
+            color:#fff; text-transform:uppercase;
+        }
+        .sidebar-header p { font-size:0.62rem; color:rgba(14,165,233,0.65); letter-spacing:1px; margin-top:2px; }
+
+        .sidebar-body { flex:1; overflow-y:auto; padding:10px 12px; }
+        .sidebar-body::-webkit-scrollbar { width:3px; }
+        .sidebar-body::-webkit-scrollbar-thumb { background:rgba(14,165,233,0.2); border-radius:2px; }
+
+        .sb-label {
+            font-family:'Share Tech Mono',monospace;
+            font-size:0.58rem; color:rgba(14,165,233,0.75);
+            letter-spacing:2px; text-transform:uppercase;
+            padding:0 2px; margin:16px 0 7px;
+        }
+        .sb-label:first-child { margin-top:4px; }
+
         .building-card {
-            background: rgba(255, 255, 255, 0.05);
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 12px;
-            padding: 12px 16px;
-            margin-bottom: 12px;
-            cursor: pointer;
-            transition: all 0.3s ease;
+            border-radius:7px; padding:9px 11px; margin-bottom:5px;
+            cursor:pointer;
+            border:1px solid rgba(255,255,255,0.06);
+            background:rgba(255,255,255,0.02);
+            transition:all 0.2s;
         }
-        
-        .building-card:hover {
-            background: rgba(255, 255, 255, 0.1);
-            transform: translateX(4px);
-            border-color: rgba(255, 255, 255, 0.2);
-        }
-        
-        .building-card.active {
-            background: rgba(59, 130, 246, 0.2);
-            border-color: rgba(59, 130, 246, 0.5);
-            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
-        }
-        
+        .building-card:hover { background:rgba(14,165,233,0.07); border-color:rgba(14,165,233,0.25); }
+        .building-card.active { background:rgba(14,165,233,0.12); border-color:rgba(14,165,233,0.4); }
+        .building-card .bc-name { font-size:0.85rem; font-weight:600; color:#fff; letter-spacing:.5px; }
+
         .floor-badge {
-            display: inline-block;
-            background: rgba(255, 255, 255, 0.08);
-            border: 1px solid rgba(255, 255, 255, 0.15);
-            border-radius: 6px;
-            padding: 4px 10px;
-            margin: 4px 4px 4px 0;
-            font-size: 0.85rem;
-            cursor: pointer;
-            transition: all 0.2s ease;
+            display:inline-block; font-size:0.73rem; font-weight:600;
+            padding:3px 9px; margin:3px 3px 0 0; border-radius:5px;
+            cursor:pointer; border:1px solid rgba(255,255,255,0.08);
+            color:rgba(255,255,255,0.82); background:rgba(255,255,255,0.05);
+            transition:all .15s;
         }
-        
-        .floor-badge:hover {
-            background: rgba(255, 255, 255, 0.15);
-            border-color: rgba(255, 255, 255, 0.3);
-        }
-        
-        .floor-badge.active {
-            background: rgba(59, 130, 246, 0.3);
-            color: #60a5fa;
-            border-color: rgba(59, 130, 246, 0.6);
-            font-weight: 600;
-        }
+        .floor-badge:hover { background:rgba(14,165,233,0.12); color:var(--c-blue); border-color:rgba(14,165,233,0.3); }
+        .floor-badge.active { background:rgba(14,165,233,0.2); color:var(--c-cyan); border-color:rgba(14,165,233,0.5); }
 
         .process-badge {
-            display: inline-block;
-            background: rgba(255, 255, 255, 0.05);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 8px;
-            padding: 6px 14px;
-            margin: 4px 4px 4px 0;
-            font-size: 0.9rem;
-            font-weight: 600;
-            letter-spacing: 1px;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            color: rgba(255, 255, 255, 0.75);
+            display:inline-block; font-size:0.72rem; font-weight:600;
+            padding:3px 9px; margin:3px 3px 0 0; border-radius:5px;
+            cursor:pointer; border:1px solid rgba(255,255,255,0.07);
+            color:rgba(255,255,255,0.8); background:rgba(255,255,255,0.04);
+            transition:all .15s;
+        }
+        .process-badge:hover { background:rgba(139,92,246,0.15); color:#c4b5fd; border-color:rgba(139,92,246,0.35); }
+        .process-badge.active { background:rgba(139,92,246,0.22); color:#c4b5fd; border-color:rgba(139,92,246,0.5); }
+
+        .time-btns { display:grid; grid-template-columns:1fr 1fr 1fr; gap:6px; }
+        .time-btn {
+            padding:8px 0; border-radius:6px;
+            font-family:'Rajdhani',sans-serif; font-size:0.8rem; font-weight:600;
+            cursor:pointer; border:1px solid rgba(255,255,255,0.07);
+            color:rgba(255,255,255,0.82); background:rgba(255,255,255,0.05);
+            text-align:center; letter-spacing:.5px; transition:all .15s;
+        }
+        .time-btn:hover { background:rgba(14,165,233,0.1); color:var(--c-blue); border-color:rgba(14,165,233,0.3); }
+        .time-btn.active { background:rgba(14,165,233,0.2); color:var(--c-cyan); border-color:rgba(14,165,233,0.5); box-shadow:0 0 8px rgba(14,165,233,0.2); }
+
+        .date-input {
+            width:100%; padding:7px 10px; border-radius:6px; margin-bottom:6px;
+            background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.09);
+            color:#fff; font-size:0.78rem;
+        }
+        .date-input:focus { outline:none; border-color:rgba(14,165,233,0.45); background:rgba(14,165,233,0.06); }
+        .date-input::-webkit-calendar-picker-indicator { filter:invert(.5) sepia(1) hue-rotate(180deg); }
+
+        .sb-btn {
+            width:100%; padding:9px; border-radius:7px; font-family:'Rajdhani',sans-serif;
+            font-size:0.85rem; font-weight:700; letter-spacing:1px;
+            cursor:pointer; border:none; margin-bottom:6px; transition:all .15s;
+            text-transform:uppercase;
+        }
+        .sb-btn-primary { background:linear-gradient(135deg,#0369a1,#0ea5e9); color:#fff; }
+        .sb-btn-primary:hover { background:linear-gradient(135deg,#0284c7,#38bdf8); box-shadow:0 4px 14px rgba(14,165,233,0.35); }
+        .sb-btn-secondary { background:rgba(255,255,255,0.04); color:rgba(255,255,255,0.85); border:1px solid rgba(255,255,255,0.12); }
+        .sb-btn-secondary:hover { background:rgba(255,255,255,0.08); }
+
+        .legend-item { display:flex; align-items:center; gap:8px; padding:6px 8px; border-radius:6px; background:rgba(255,255,255,0.03); margin-bottom:5px; }
+        .legend-dot  { width:10px; height:10px; border-radius:3px; flex-shrink:0; }
+        .legend-label { font-size:0.78rem; color:rgba(255,255,255,0.9); }
+        .device-count { font-size:0.64rem; color:rgba(14,165,233,0.6); text-align:center; padding:10px 0 0; font-family:'Share Tech Mono',monospace; }
+
+        /* ════════════════════════════════════════════════════
+           主內容
+        ════════════════════════════════════════════════════ */
+        .main-content {
+            margin-left:var(--sidebar-w); height:100vh; overflow-y:auto;
+            background:var(--c-bg);
+            transition:margin-left 0.32s cubic-bezier(.4,0,.2,1);
+        }
+        .main-content.expanded { margin-left:0; }
+        .main-content::-webkit-scrollbar { width:5px; }
+        .main-content::-webkit-scrollbar-thumb { background:#1a2030; border-radius:3px; }
+
+        .status-bar { position:absolute; top:0; height:100%; cursor:pointer; transition:opacity .12s; }
+        .status-bar:hover { opacity:.75; }
+
+        .load-more-hint {
+            text-align:center; padding:14px;
+            font-size:0.78rem; color:rgba(14,165,233,0.3);
+            border-top:1px solid rgba(0,0,0,0.08);
+            font-family:'Share Tech Mono',monospace; letter-spacing:1px;
         }
 
-        .process-badge:hover {
-            background: rgba(168, 85, 247, 0.2);
-            border-color: rgba(168, 85, 247, 0.4);
-            color: #c4b5fd;
-        }
-
-        .process-badge.active {
-            background: rgba(168, 85, 247, 0.3);
-            color: #c4b5fd;
-            border-color: rgba(168, 85, 247, 0.6);
-            box-shadow: 0 0 8px rgba(168, 85, 247, 0.3);
-        }
-        
-        .time-range-btn {
-            background: rgba(255, 255, 255, 0.08);
-            border: 1px solid rgba(255, 255, 255, 0.15);
-            border-radius: 8px;
-            padding: 10px 16px;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            color: white;
-            font-weight: 500;
-        }
-        
-        .time-range-btn:hover {
-            background: rgba(255, 255, 255, 0.15);
-            border-color: rgba(255, 255, 255, 0.3);
-        }
-        
-        .time-range-btn.active {
-            background: rgba(59, 130, 246, 0.3);
-            color: #60a5fa;
-            border-color: rgba(59, 130, 246, 0.6);
-        }
-        
-        .sidebar-title {
-            font-size: 1.5rem;
-            font-weight: 700;
-            text-align: center;
-            padding: 24px 20px;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-            background: rgba(0, 0, 0, 0.3);
-        }
-        
-        .sidebar-section {
-            padding: 20px;
-        }
-        
-        .custom-input {
-            background: rgba(255, 255, 255, 0.08);
-            border: 1px solid rgba(255, 255, 255, 0.15);
-            border-radius: 8px;
-            padding: 8px 12px;
-            color: white;
-            width: 100%;
-            margin-bottom: 8px;
-        }
-        
-        .custom-input::placeholder {
-            color: rgba(255, 255, 255, 0.4);
-        }
-        
-        .custom-input:focus {
-            outline: none;
-            background: rgba(255, 255, 255, 0.12);
-            border-color: rgba(59, 130, 246, 0.6);
-        }
-        
-        .action-btn {
-            background: rgba(59, 130, 246, 0.9);
-            color: white;
-            border: none;
-            border-radius: 8px;
-            padding: 10px 20px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            width: 100%;
-            margin-bottom: 8px;
-        }
-        
-        .action-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
-            background: rgba(59, 130, 246, 1);
-        }
-        
-        .action-btn.secondary {
-            background: rgba(255, 255, 255, 0.08);
-            color: white;
-            border: 1px solid rgba(255, 255, 255, 0.15);
-        }
-        
-        .action-btn.secondary:hover {
-            background: rgba(255, 255, 255, 0.15);
-            box-shadow: 0 4px 12px rgba(255, 255, 255, 0.1);
-        }
-        
-        /* 滾動條樣式 */
-        .sidebar::-webkit-scrollbar,
-        .main-content::-webkit-scrollbar {
-            width: 8px;
-        }
-        
-        .sidebar::-webkit-scrollbar-track {
-            background: rgba(255, 255, 255, 0.05);
-        }
-        
-        .sidebar::-webkit-scrollbar-thumb {
-            background: rgba(255, 255, 255, 0.2);
-            border-radius: 4px;
-        }
-        
-        .sidebar::-webkit-scrollbar-thumb:hover {
-            background: rgba(255, 255, 255, 0.3);
-        }
-
-        .main-content::-webkit-scrollbar-track {
-            background: #1a1a1a;
-        }
-        
-        .main-content::-webkit-scrollbar-thumb {
-            background: #333;
-            border-radius: 4px;
-        }
-        
-        .main-content::-webkit-scrollbar-thumb:hover {
-            background: #444;
-        }
-
-        /* Loading 動畫 */
-        .loading-screen {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100vw;
-            height: 100vh;
-            background: linear-gradient(135deg, #000000 0%, #1a1a1a 100%);
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            z-index: 9999;
-            transition: opacity 0.5s ease-out;
-        }
-
-        .loading-screen.fade-out {
-            opacity: 0;
-            pointer-events: none;
-        }
-
-        .loader-container {
-            position: relative;
-            width: 150px;
-            height: 150px;
-        }
-
-        .loader-ring {
-            position: absolute;
-            width: 100%;
-            height: 100%;
-            border: 4px solid transparent;
-            border-radius: 50%;
-            animation: rotate 2s linear infinite;
-        }
-
-        .loader-ring:nth-child(1) {
-            border-top-color: #3b82f6;
-            animation-duration: 2s;
-        }
-
-        .loader-ring:nth-child(2) {
-            border-right-color: #60a5fa;
-            animation-duration: 1.5s;
-            animation-direction: reverse;
-        }
-
-        .loader-ring:nth-child(3) {
-            border-bottom-color: #93c5fd;
-            animation-duration: 2.5s;
-        }
-
-        @keyframes rotate {
-            0% {
-                transform: rotate(0deg);
-            }
-            100% {
-                transform: rotate(360deg);
-            }
-        }
-
-        .loader-text {
-            margin-top: 30px;
-            color: white;
-            font-size: 1.2rem;
-            font-weight: 600;
-            letter-spacing: 2px;
-            animation: pulse 1.5s ease-in-out infinite;
-        }
-
-        @keyframes pulse {
-            0%, 100% {
-                opacity: 1;
-            }
-            50% {
-                opacity: 0.5;
-            }
-        }
-
-        .loader-dots {
-            display: inline-block;
-            width: 60px;
-            text-align: left;
-        }
-
-        .loader-dots::after {
-            content: '';
-            animation: dots 1.5s steps(4, end) infinite;
-        }
-
-        @keyframes dots {
-            0%, 20% {
-                content: '';
-            }
-            40% {
-                content: '.';
-            }
-            60% {
-                content: '..';
-            }
-            80%, 100% {
-                content: '...';
-            }
-        }
-
-        .loader-icon {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            font-size: 3rem;
-            animation: iconPulse 2s ease-in-out infinite;
-        }
-
-        @keyframes iconPulse {
-            0%, 100% {
-                transform: translate(-50%, -50%) scale(1);
-                opacity: 1;
-            }
-            50% {
-                transform: translate(-50%, -50%) scale(1.1);
-                opacity: 0.8;
-            }
-        }
-
-        /* 中間載入動畫 */
-        .center-loading {
-            position: fixed;
-            left: 320px;
-            top: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0, 0, 0, 0.8);
-            backdrop-filter: blur(5px);
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            z-index: 999;
-            opacity: 0;
-            pointer-events: none;
-            transition: opacity 0.3s ease;
-        }
-
-        .center-loading.active {
-            opacity: 1;
-            pointer-events: all;
-        }
-
-        .center-spinner {
-            width: 80px;
-            height: 80px;
-            position: relative;
-        }
-
-        .center-spinner-ring {
-            position: absolute;
-            width: 100%;
-            height: 100%;
-            border: 3px solid transparent;
-            border-radius: 50%;
-            border-top-color: #3b82f6;
-            animation: spin 1s linear infinite;
-        }
-
-        .center-spinner-ring:nth-child(2) {
-            border-top-color: #60a5fa;
-            animation-duration: 0.8s;
-            animation-direction: reverse;
-            width: 70%;
-            height: 70%;
-            top: 15%;
-            left: 15%;
-        }
-
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-
-        .center-loading-text {
-            margin-top: 20px;
-            color: white;
-            font-size: 1.1rem;
-            font-weight: 600;
-            letter-spacing: 1px;
-        }
-
-        .center-loading-dots::after {
-            content: '';
-            animation: dots 1.5s steps(4, end) infinite;
-        }
+        @keyframes spin { to{transform:rotate(360deg)} }
     </style>
 </head>
 <body>
-    <!-- Loading 動畫 -->
-    <div id="loadingScreen" class="loading-screen">
-        <div class="loader-container">
-            <div class="loader-ring"></div>
-            <div class="loader-ring"></div>
-            <div class="loader-ring"></div>
-            <div class="loader-icon">👍</div>
-        </div>
-        <div class="loader-text text-center">
-            載入中<span class="loader-dots"></span>
-        </div>
+
+<!-- ── 初始 Loading ─────────────────────────────────────────── -->
+<div id="loadingScreen" class="loading-screen">
+    <div class="ls-grid"></div>
+    <div class="ls-scanbeam"></div>
+
+    <div class="ls-corner tl"></div>
+    <div class="ls-corner tr"></div>
+    <div class="ls-corner bl"></div>
+    <div class="ls-corner br"></div>
+
+    <!-- 側邊數據流 -->
+    <div class="ls-datastream left">
+        SYS_INIT..........<br>
+        CONN_CHECK........<br>
+        DATA_STREAM.......<br>
+        STATION_SCAN......<br>
+        AUTH_TOKEN........<br>
+        API_HANDSHAKE.....
+    </div>
+    <div class="ls-datastream right">
+        ..........OK<br>
+        ........PING<br>
+        ......ACTIVE<br>
+        ......ONLINE<br>
+        ......VERIFY<br>
+        .......READY
     </div>
 
-    <!-- 中間載入動畫 -->
-    <div id="centerLoading" class="center-loading">
-        <div class="center-spinner">
-            <div class="center-spinner-ring"></div>
-            <div class="center-spinner-ring"></div>
-        </div>
-        <div class="loader-text w-full text-center">
-            載入中<span class="loader-dots"></span>
-        </div>
+    <!-- 主環 -->
+    <div class="ls-rings">
+        <div class="ls-glow"></div>
+        <div class="ls-ring ls-ring-1"></div>
+        <div class="ls-ring ls-ring-2"></div>
+        <div class="ls-ring ls-ring-3"></div>
+        <div class="ls-ring ls-ring-4"></div>
+        <div class="ls-orbit"></div>
+        <div class="ls-orbit-2"></div>
+        <div class="ls-core"></div>
     </div>
 
-    <div id="app">
-        <!-- 左側固定區域 -->
+    <!-- 文字 -->
+    <div class="ls-text">
+        <div class="ls-title">設備狀態時序圖</div>
+        <div class="ls-subtitle">MACHINE STATUS TIMELINE SYSTEM</div>
+        <div class="ls-progress"><div class="ls-progress-fill"></div></div>
+        <div class="ls-status">INITIALIZING SYSTEM<span id="lsDots"></span></div>
+    </div>
+</div>
+
+<!-- ── 搜尋 Loading ──────────────────────────────────────────── -->
+<div id="centerLoading" class="center-loading">
+    <div class="cl-topbar"><div class="cl-progress-bar"></div></div>
+    <div class="cl-radar-wrap">
+        <div class="cl-ring cl-ring-1"></div>
+        <div class="cl-ring cl-ring-2"></div>
+        <div class="cl-sweep"></div>
+        <div class="cl-core"></div>
+    </div>
+    <div class="cl-label">資料載入中</div>
+    <div class="cl-status" id="clStatusText">正在查詢資料</div>
+</div>
+
+<!-- ── Vue App ────────────────────────────────────────────────── -->
+<div id="app">
+
+    <!-- 搜尋計時器（fixed 固定右下角，在 #app 內由 Vue 控制） -->
+    <!-- 搜尋計時器：固定底部橫條，跟隨 sidebar 收合狀態 -->
+    <div v-if="searchElapsed > 0 || isSearching"
+         class="search-timer"
+         :class="{ 'sidebar-collapsed': sidebarCollapsed }">
+        <div class="timer-dot" :class="{ done: !isSearching }"></div>
+        搜尋時間：{{ searchElapsed }} S
+    </div>
+
+    <!-- Sidebar -->
+    <div class="sidebar-wrapper" :class="{ collapsed: sidebarCollapsed }">
         <div class="sidebar">
-            <!-- 標題 -->
-            <div class="sidebar-title">
-                設備狀態時序圖
+            <div class="sidebar-header">
+                <h1>設備狀態時序圖</h1>
+                <p>MACHINE STATUS TIMELINE</p>
             </div>
-            
-            <!-- 載入狀態 -->
-            <div v-if="loading" class="sidebar-section">
-                <div class="text-center">
-                    <div class="inline-block animate-spin rounded-full h-10 w-10 border-b-2 border-white"></div>
-                    <p class="mt-3 text-white/80">載入中...</p>
+            <div class="sidebar-body">
+
+                <div v-if="loading" style="text-align:center;padding:28px 0;">
+                    <div style="display:inline-block;width:28px;height:28px;border:2px solid rgba(14,165,233,0.2);border-top-color:#0ea5e9;border-radius:50%;animation:spin .9s linear infinite;"></div>
+                    <p style="margin-top:10px;font-size:0.72rem;color:rgba(14,165,233,0.4);letter-spacing:1px;font-family:'Share Tech Mono',monospace;">INITIALIZING...</p>
                 </div>
-            </div>
-            
-            <!-- 錯誤訊息 -->
-            <div v-if="error" class="sidebar-section">
-                <div class="bg-red-500/20 border border-red-300 rounded-lg p-3 text-white text-sm">
+
+                <div v-if="error" style="margin:8px 0;padding:10px 12px;background:rgba(239,68,68,0.12);border:1px solid rgba(239,68,68,0.3);border-radius:7px;font-size:0.75rem;color:#fca5a5;">
                     {{ error }}
                 </div>
-            </div>
-            
-            <div v-if="!loading && !error">
-                <!-- Building 選擇區 -->
-                <div class="sidebar-section">
-                    <div class="space-y-2">
-                        <div 
-                            v-for="building in availableBuildings" 
-                            :key="building"
-                            @click="selectBuilding(building)"
-                            class="building-card"
-                            :class="{ active: selectedBuilding === building }">
-                            <div class="flex items-center justify-between">
-                                <span class="font-semibold">{{ building }}</span>
-                                <svg v-if="selectedBuilding === building" class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                                    <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
-                                </svg>
-                            </div>
-                            
-                            <!-- Floor 選擇 -->
-                            <div v-if="selectedBuilding === building && buildingFloors[building]" class="mt-3 pt-3 border-t border-white/20">
-                                <div class="text-xs mb-2 opacity-60 uppercase tracking-widest">Floor</div>
-                                <div class="flex flex-wrap">
-                                    <span 
-                                        v-for="floor in buildingFloors[building]" 
-                                        :key="floor"
-                                        @click.stop="selectFloor(floor)"
-                                        class="floor-badge"
-                                        :class="{ active: selectedFloor === floor }">
-                                        {{ floor }}
-                                    </span>
-                                </div>
-                            </div>
 
-                            <!-- Process Code 選擇 -->
-                            <div v-if="selectedBuilding === building && selectedFloor && availableProcessCodes.length > 0" class="mt-3 pt-3 border-t border-white/10">
-                                <div class="text-xs mb-2 opacity-60 uppercase tracking-widest">站點</div>
-                                <div class="flex flex-wrap">
-                                    <span
-                                        v-for="code in availableProcessCodes"
-                                        :key="code"
-                                        @click.stop="selectProcessCode(code)"
-                                        class="process-badge"
-                                        :class="{ active: selectedProcessCode === code }">
-                                        {{ code }}
-                                    </span>
-                                </div>
-                            </div>
+                <template v-if="!loading && !error">
+                    <div class="sb-label">廠棟</div>
+                    <div v-for="building in availableBuildings" :key="building"
+                         class="building-card" :class="{ active: selectedBuilding === building }"
+                         @click="selectBuilding(building)">
+                        <div style="display:flex;justify-content:space-between;align-items:center;">
+                            <span class="bc-name">{{ building }}</span>
+                            <svg v-if="selectedBuilding === building" style="width:13px;height:13px;color:#0ea5e9;" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+                            </svg>
+                        </div>
+                        <div v-if="selectedBuilding === building && buildingFloors[building]"
+                             style="margin-top:9px;padding-top:9px;border-top:1px solid rgba(14,165,233,0.08);">
+                            <div style="font-size:0.58rem;color:rgba(14,165,233,0.35);letter-spacing:1.5px;margin-bottom:6px;font-family:'Share Tech Mono',monospace;">FLOOR</div>
+                            <span v-for="floor in buildingFloors[building]" :key="floor"
+                                  class="floor-badge" :class="{ active: selectedFloor === floor }"
+                                  @click.stop="selectFloor(floor)">{{ floor }}</span>
+                        </div>
+                        <div v-if="selectedBuilding === building && selectedFloor && availableProcessCodes.length > 0"
+                             style="margin-top:9px;padding-top:9px;border-top:1px solid rgba(255,255,255,0.05);">
+                            <div style="font-size:0.58rem;color:rgba(14,165,233,0.3);letter-spacing:1.5px;margin-bottom:6px;font-family:'Share Tech Mono',monospace;">站點</div>
+                            <span v-for="code in availableProcessCodes" :key="code"
+                                  class="process-badge" :class="{ active: selectedProcessCode === code }"
+                                  @click.stop="selectProcessCode(code)">{{ code }}</span>
                         </div>
                     </div>
-                </div>
-                
-                <!-- 時間範圍選擇 -->
-                <div class="sidebar-section">
-                    <!-- 快速選擇 - 2x2 佈局 -->
-                    <div class="mb-4">
-                        <div class="text-sm mb-2 opacity-80">快速選擇：</div>
-                        <div class="grid grid-cols-2 gap-3">
-                            <button @click="selectQuickRange(1)" class="time-range-btn w-full" :class="{ active: quickRange === 1 }">
-                                24小時
-                            </button>
-                            <button @click="selectQuickRange(7)" class="time-range-btn w-full" :class="{ active: quickRange === 7 }">
-                                7天
-                            </button>
-                            <button @click="selectQuickRange(30)" class="time-range-btn w-full" :class="{ active: quickRange === 30 }">
-                                30天
-                            </button>
-                            <button @click="selectQuickRange(null)" class="time-range-btn w-full" :class="{ active: quickRange === null }">
-                                全部
-                            </button>
-                        </div>
+
+                    <div class="sb-label">快速選擇</div>
+                    <div class="time-btns">
+                        <div class="time-btn" :class="{ active: quickRange === 1 }"  @click="selectQuickRange(1)">24H</div>
+                        <div class="time-btn" :class="{ active: quickRange === 7 }"  @click="selectQuickRange(7)">7天</div>
+                        <div class="time-btn" :class="{ active: quickRange === 30 }" @click="selectQuickRange(30)">30天</div>
                     </div>
-                    
-                    <!-- 自訂日期 -->
-                    <div class="border-t border-white/20 pt-4">
-                        <div class="text-sm mb-2 opacity-80">自訂日期範圍：</div>
-                        <input type="date" v-model="customStartDate" :max="todayStr" class="custom-input" placeholder="開始日期">
-                        <input type="date" v-model="customEndDate" :max="todayStr" class="custom-input" placeholder="結束日期">
-                        <button @click="applyCustomRange" class="action-btn">
-                            🔍 查詢
-                        </button>
-                        <button @click="resetFilter" class="action-btn secondary">
-                            🔄 重置
-                        </button>
+
+                    <div class="sb-label" style="margin-top:14px;">自訂日期（最多30天）</div>
+                    <input type="date" v-model="customStartDate" class="date-input">
+                    <input type="date" v-model="customEndDate"   class="date-input">
+                    <button class="sb-btn sb-btn-primary"    @click="applyCustomRange">🔍 查詢</button>
+                    <button class="sb-btn sb-btn-secondary"  @click="resetFilter">↺ 重置</button>
+
+                    <div class="sb-label" style="margin-top:14px;">狀態圖例</div>
+                    <div class="legend-item">
+                        <div class="legend-dot" style="background:#ef4444;box-shadow:0 0 6px rgba(239,68,68,0.5);"></div>
+                        <span class="legend-label">ALARM（警報）</span>
                     </div>
-                </div>
-                
-                <!-- 圖例 -->
-                <div class="sidebar-section">
-                    <div class="space-y-2">
-                        <div class="flex items-center gap-3 p-2 rounded-lg bg-white/10">
-                            <div class="w-6 h-6 bg-red-500 rounded"></div>
-                            <span class="font-medium">ALARM (警報)</span>
-                        </div>
-                        <div class="flex items-center gap-3 p-2 rounded-lg bg-white/10">
-                            <div class="w-6 h-6 bg-green-500 rounded"></div>
-                            <span class="font-medium">BUSY (忙碌)</span>
-                        </div>
+                    <div class="legend-item">
+                        <div class="legend-dot" style="background:#22c55e;box-shadow:0 0 6px rgba(34,197,94,0.4);"></div>
+                        <span class="legend-label">BUSY（忙碌）</span>
                     </div>
-                </div>
-            </div>
-        </div>
-        
-        <!-- 右側主要內容區域（可滾動） -->
-        <div class="main-content">
-            <div class="max-w-7xl mx-auto p-6">
-                <!-- 圖表區域 -->
-                <div v-if="!loading && !error" class="bg-white rounded-2xl shadow-lg p-6 mb-6">
-                    <h2 class="text-2xl font-bold text-gray-800 mb-4 flex items-center gap-2">
-                        <svg class="w-7 h-7 text-indigo-600" fill="currentColor" viewBox="0 0 20 20">
-                            <path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z"/>
-                        </svg>
-                        時序圖表
-                    </h2>
-                    <!-- 純 HTML/CSS 時序圖，不依賴 Canvas -->
-                    <div v-if="chartStations.length > 0">
-
-                        <!-- 每條 Station 一列 -->
-                        <div v-for="(station, idx) in chartStations" :key="station"
-                             :style="{ marginBottom: idx < chartStations.length - 1 ? '30px' : '0' }">
-                            <div style="display:flex; align-items:center; height:100px;">
-
-                                <!-- 左側標籤（完整顯示） -->
-                                <div :title="station"
-                                     style="flex-shrink:0; width:200px; min-width:200px; font-size:12px; font-weight:600; color:#1f2937; word-break:break-all; white-space:normal; line-height:1.4; padding-right:12px; display:flex; align-items:center;">
-                                    {{ station }}
-                                </div>
-
-                                <!-- 右側時序條（含每小時垂直參考線） -->
-                                <div style="flex:1; min-width:0; height:100px; position:relative; background:#f3f4f6; border-radius:4px; overflow:hidden;">
-                                    <!-- 每小時垂直參考線（渲染在色條之下） -->
-                                    <div v-for="tick in timeTicks" :key="'gl-'+tick.pos"
-                                         :style="{
-                                             position:'absolute', left: tick.pos+'%', top:'0', bottom:'0',
-                                             width:'1px',
-                                             background: tick.showLabel ? 'rgba(0,0,0,0.22)' : 'rgba(0,0,0,0.08)',
-                                             pointerEvents:'none'
-                                         }">
-                                    </div>
-                                    <!-- 狀態色條（DOM 在後，自動疊在參考線之上） -->
-                                    <div v-for="item in getStationItems(station)" :key="item.start"
-                                         :style="getBarStyle(item)"
-                                         :title="getBarTooltip(item)"
-                                         @click="onBarClick(station)">
-                                    </div>
-                                </div>
-
-                            </div>
-                        </div>
-
-                        <!-- X 軸時間標籤（每小時、斜向顯示） -->
-                        <div style="display:flex; margin-top:0;">
-                            <div style="flex-shrink:0; width:200px;"></div>
-                            <div style="flex:1; position:relative; height:80px;">
-                                <span v-for="tick in timeTickLabels" :key="tick.pos"
-                                      :style="{
-                                          position:'absolute',
-                                          left: tick.pos+'%',
-                                          bottom:'2px',
-                                          top:'auto',
-                                          transformOrigin:'0% 100%',
-                                          transform:'rotate(-45deg)',
-                                          fontSize:'10px',
-                                          color:'#4b5563',
-                                          whiteSpace:'nowrap',
-                                          lineHeight:'1'
-                                      }">
-                                    {{ tick.label }}
-                                </span>
-                            </div>
-                        </div>
-
+                    <div v-if="chartStations.length > 0" class="device-count">
+                        {{ visibleChartStations.length }} / {{ chartStations.length }} STATIONS
                     </div>
-                    <div v-else style="color:#9ca3af; padding:20px 0;">載入中或無資料...</div>
-                </div>
-
-                <!-- 統計資訊 -->
-                <div id="statsSection" v-if="!loading && !error && stats" class="bg-white rounded-2xl shadow-lg p-6">
-                    <h2 class="text-2xl font-bold text-gray-800 mb-4 flex items-center gap-2">
-                        <svg class="w-7 h-7 text-indigo-600" fill="currentColor" viewBox="0 0 20 20">
-                            <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z"/>
-                            <path fill-rule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clip-rule="evenodd"/>
-                        </svg>
-                        統計資訊
-                    </h2>
-                    
-                    <!-- 設備選擇按鈕 -->
-                    <div class="flex gap-3 mb-6 flex-wrap">
-                        <button v-for="station in Object.keys(stats)" :key="station"
-                                @click="selectedStation = station"
-                                class="px-4 py-2 rounded-lg font-medium transition-all"
-                                :class="selectedStation === station 
-                                    ? 'bg-indigo-600 text-white shadow-md transform scale-105' 
-                                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'">
-                            {{ station }}
-                        </button>
-                    </div>
-                    
-                    <!-- 顯示選中設備的資訊 -->
-                    <div v-if="selectedStation && stats[selectedStation]" class="border border-gray-200 rounded-xl p-5 bg-gradient-to-br from-gray-50 to-white">
-                        <h3 class="font-bold text-xl text-gray-800 mb-4 pb-3 border-b-2 border-indigo-200">
-                            {{ selectedStation }} (Down Rate: {{ currentDownRate.toFixed(1) }}%)
-                        </h3>
-                        
-                        <!-- 總計 -->
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-5">
-                            <div class="bg-gradient-to-br from-red-50 to-red-100 rounded-xl p-4 border border-red-200">
-                                <div class="flex items-center gap-2 mb-2">
-                                    <div class="w-4 h-4 bg-red-500 rounded-full animate-pulse"></div>
-                                    <span class="font-semibold text-gray-800 text-lg">ALARM 總計</span>
-                                </div>
-                                <div class="text-gray-700 text-sm">
-                                    <div class="flex justify-between mb-1">
-                                        <span>次數：</span>
-                                        <span class="font-bold">{{ stats[selectedStation].ALARM.count }} 次</span>
-                                    </div>
-                                    <div class="flex justify-between">
-                                        <span>時長：</span>
-                                        <span class="font-bold">{{ stats[selectedStation].ALARM.totalMinutes.toFixed(0) }} 分 ({{ stats[selectedStation].ALARM.hours }}h)</span>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-4 border border-green-200">
-                                <div class="flex items-center gap-2 mb-2">
-                                    <div class="w-4 h-4 bg-green-500 rounded-full"></div>
-                                    <span class="font-semibold text-gray-800 text-lg">BUSY 總計</span>
-                                </div>
-                                <div class="text-gray-700 text-sm">
-                                    <div class="flex justify-between mb-1">
-                                        <span>次數：</span>
-                                        <span class="font-bold">{{ stats[selectedStation].BUSY.count }} 次</span>
-                                    </div>
-                                    <div class="flex justify-between">
-                                        <span>時長：</span>
-                                        <span class="font-bold">{{ stats[selectedStation].BUSY.totalMinutes.toFixed(0) }} 分 ({{ stats[selectedStation].BUSY.hours }}h)</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <!-- 詳細時間列表 -->
-                        <div class="mt-5">
-                            <h4 class="font-semibold text-gray-700 mb-3 flex items-center gap-2">
-                                <svg class="w-5 h-5 text-indigo-600" fill="currentColor" viewBox="0 0 20 20">
-                                    <path fill-rule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clip-rule="evenodd"/>
-                                </svg>
-                                詳細時間記錄
-                            </h4>
-                            <div class="max-h-96 overflow-y-auto space-y-2 text-sm">
-                                <div v-for="(item, index) in stats[selectedStation].timeline" :key="index" 
-                                     class="flex items-center justify-between p-3 rounded-lg hover:shadow-md transition-all"
-                                     :class="item.status === 'ALARM' ? 'bg-red-50 border-l-4 border-red-500' : 'bg-green-50 border-l-4 border-green-500'">
-                                    <div class="flex items-center gap-2">
-                                        <div class="w-3 h-3 rounded-full" 
-                                             :class="item.status === 'ALARM' ? 'bg-red-500' : 'bg-green-500'"></div>
-                                        <span class="font-medium" :class="item.status === 'ALARM' ? 'text-red-700' : 'text-green-700'">
-                                            {{ item.status }}
-                                        </span>
-                                    </div>
-                                    <div class="flex items-center gap-3 text-gray-600">
-                                        <span>{{ item.startFormatted }}</span>
-                                        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                                            <path fill-rule="evenodd" d="M12.293 5.293a1 1 0 011.414 0l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-2.293-2.293a1 1 0 010-1.414z" clip-rule="evenodd"/>
-                                        </svg>
-                                        <span>{{ item.endFormatted }}</span>
-                                        <span class="text-gray-500 font-semibold">({{ item.duration }}分)</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                </template>
             </div>
         </div>
     </div>
 
-    <script src="static/js/app.js"></script>
+    <!-- Sidebar 收合按鈕 -->
+    <div class="sidebar-toggle"
+         :style="{ left: sidebarCollapsed ? '0px' : 'var(--sidebar-w)' }"
+         @click="toggleSidebar">
+        {{ sidebarCollapsed ? '▶' : '◀' }}
+    </div>
+
+    <!-- 主內容 -->
+    <div class="main-content" :class="{ expanded: sidebarCollapsed }">
+        <div style="max-width:1400px;margin:0 auto;padding:24px;">
+
+            <div v-if="!loading && !error" class="bg-white rounded-2xl shadow-lg p-6 mb-6">
+                <h2 class="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
+                    <svg class="w-6 h-6 text-indigo-600" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z"/>
+                    </svg>
+                    時序圖表
+                </h2>
+
+                <div v-if="visibleChartStations.length > 0">
+                    <div v-for="(station, idx) in visibleChartStations" :key="station"
+                         :style="{ marginBottom: idx < visibleChartStations.length-1 ? '28px' : '0' }">
+                        <div style="display:flex;align-items:center;height:90px;">
+                            <div :title="station"
+                                 style="flex-shrink:0;width:200px;min-width:200px;font-size:11px;font-weight:600;color:#1f2937;word-break:break-all;white-space:normal;line-height:1.4;padding-right:12px;display:flex;align-items:center;">
+                                {{ station }}
+                            </div>
+                            <div style="flex:1;min-width:0;height:90px;position:relative;background:#f3f4f6;border-radius:4px;overflow:hidden;">
+                                <div v-for="tick in timeTicks" :key="'g'+tick.pos"
+                                     :style="{
+                                         position:'absolute',left:tick.pos+'%',top:'0',bottom:'0',
+                                         width:tick.showLabel?'2px':'1px',
+                                         background:tick.showLabel?'rgba(0,0,0,0.35)':'rgba(0,0,0,0.1)',
+                                         pointerEvents:'none',zIndex:2
+                                     }"></div>
+                                <div v-for="item in getStationItems(station)" :key="item.start"
+                                     class="status-bar"
+                                     :style="getBarStyle(item)"
+                                     :title="getBarTooltip(item)"
+                                     @click="onBarClick(station)"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div style="display:flex;margin-top:0;">
+                        <div style="flex-shrink:0;width:200px;"></div>
+                        <div style="flex:1;position:relative;height:72px;overflow:hidden;">
+                            <span v-for="tick in timeTickLabels" :key="tick.pos"
+                                  :style="{
+                                      position:'absolute',left:tick.pos+'%',bottom:'2px',
+                                      transformOrigin:'0% 100%',transform:'rotate(-45deg)',
+                                      fontSize:'10px',color:'#6b7280',whiteSpace:'nowrap',lineHeight:'1'
+                                  }">{{ tick.label }}</span>
+                        </div>
+                    </div>
+
+                    <div v-if="hasMoreStations" class="load-more-hint">
+                        ↓ 向下滾動載入更多（還有 {{ chartStations.length - visibleStationCount }} 台）
+                    </div>
+                </div>
+                <!-- 查無資料 -->
+                <div v-else style="text-align:center;padding:36px 0;">
+                    <template v-if="timelineData.length === 0">
+                        <div style="font-size:2.2rem;margin-bottom:14px;">🔍</div>
+                        <div style="font-weight:700;font-size:1rem;color:#374151;margin-bottom:8px;">
+                            此條件查無資料
+                        </div>
+                        <div style="font-size:0.82rem;color:#9ca3af;margin-bottom:4px;">
+                            <span v-if="selectedBuilding">{{ selectedBuilding }}</span>
+                            <span v-if="selectedFloor"> &middot; {{ selectedFloor }}</span>
+                            &nbsp;在&nbsp;
+                            <span v-if="quickRange === 1">最近 24 小時</span>
+                            <span v-else-if="quickRange">最近 {{ quickRange }} 天</span>
+                            <span v-else>選定的日期範圍</span>
+                            &nbsp;內沒有機台狀態資料
+                        </div>
+                        <div style="font-size:0.78rem;color:#d1d5db;margin-top:10px;
+                                    background:#f9fafb;border:1px dashed #e5e7eb;
+                                    border-radius:8px;padding:10px 18px;display:inline-block;">
+                            💡 請嘗試選擇 <strong>7天</strong> 或 <strong>30天</strong> 查看是否有歷史資料
+                        </div>
+                    </template>
+                    <template v-else>
+                        <div style="font-size:1.5rem;margin-bottom:10px;">⏳</div>
+                        <div style="font-size:0.88rem;color:#9ca3af;">載入中...</div>
+                    </template>
+                </div>
+            </div>
+
+            <!-- 統計資訊 -->
+            <div id="statsSection" v-if="!loading && !error && stats" class="bg-white rounded-2xl shadow-lg p-6">
+                <h2 class="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
+                    <svg class="w-6 h-6 text-indigo-600" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z"/>
+                        <path fill-rule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clip-rule="evenodd"/>
+                    </svg>
+                    統計資訊
+                </h2>
+                <div class="flex gap-2 mb-5 flex-wrap">
+                    <button v-for="st in Object.keys(stats)" :key="st"
+                            @click="selectedStation = st"
+                            class="px-3 py-1.5 rounded-lg text-sm font-medium transition-all"
+                            :class="selectedStation===st?'bg-indigo-600 text-white shadow scale-105':'bg-gray-100 text-gray-700 hover:bg-gray-200'">
+                        {{ st }}
+                    </button>
+                </div>
+                <div v-if="selectedStation && stats[selectedStation]"
+                     class="border border-gray-200 rounded-xl p-5 bg-gradient-to-br from-gray-50 to-white">
+                    <h3 class="font-bold text-lg text-gray-800 mb-4 pb-3 border-b-2 border-indigo-200">
+                        {{ selectedStation }}（Down Rate：{{ currentDownRate.toFixed(1) }}%）
+                    </h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                        <div class="bg-gradient-to-br from-red-50 to-red-100 rounded-xl p-4 border border-red-200">
+                            <div class="flex items-center gap-2 mb-2">
+                                <div class="w-3 h-3 bg-red-500 rounded-full animate-pulse"></div>
+                                <span class="font-semibold text-gray-800">ALARM 總計</span>
+                            </div>
+                            <div class="text-sm text-gray-700 space-y-1">
+                                <div class="flex justify-between"><span>次數：</span><span class="font-bold">{{ stats[selectedStation].ALARM.count }} 次</span></div>
+                                <div class="flex justify-between"><span>時長：</span><span class="font-bold">{{ stats[selectedStation].ALARM.totalMinutes.toFixed(0) }} 分（{{ stats[selectedStation].ALARM.hours }}h）</span></div>
+                            </div>
+                        </div>
+                        <div class="bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-4 border border-green-200">
+                            <div class="flex items-center gap-2 mb-2">
+                                <div class="w-3 h-3 bg-green-500 rounded-full"></div>
+                                <span class="font-semibold text-gray-800">BUSY 總計</span>
+                            </div>
+                            <div class="text-sm text-gray-700 space-y-1">
+                                <div class="flex justify-between"><span>次數：</span><span class="font-bold">{{ stats[selectedStation].BUSY.count }} 次</span></div>
+                                <div class="flex justify-between"><span>時長：</span><span class="font-bold">{{ stats[selectedStation].BUSY.totalMinutes.toFixed(0) }} 分（{{ stats[selectedStation].BUSY.hours }}h）</span></div>
+                            </div>
+                        </div>
+                    </div>
+                    <h4 class="font-semibold text-gray-700 mb-3 text-sm">詳細時間記錄</h4>
+                    <div class="max-h-80 overflow-y-auto space-y-1.5 text-sm">
+                        <div v-for="(item, i) in stats[selectedStation].timeline" :key="i"
+                             class="flex items-center justify-between p-2.5 rounded-lg"
+                             :class="item.status==='ALARM'?'bg-red-50 border-l-4 border-red-400':'bg-green-50 border-l-4 border-green-400'">
+                            <div class="flex items-center gap-2">
+                                <div class="w-2.5 h-2.5 rounded-full" :class="item.status==='ALARM'?'bg-red-500':'bg-green-500'"></div>
+                                <span class="font-medium" :class="item.status==='ALARM'?'text-red-700':'text-green-700'">{{ item.status }}</span>
+                            </div>
+                            <div class="flex items-center gap-2 text-gray-600">
+                                <span>{{ item.startFormatted }}</span><span>→</span>
+                                <span>{{ item.endFormatted }}</span>
+                                <span class="font-semibold text-gray-500">（{{ item.duration }}分）</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<script>
+// 初始 loading dots 動畫
+;(function(){
+    const el = document.getElementById('lsDots');
+    if (!el) return;
+    let i = 0;
+    const frames = ['', '.', '..', '...'];
+    setInterval(() => { el.textContent = frames[i++ % 4]; }, 500);
+})();
+</script>
+<script src="static/js/app.js"></script>
 </body>
 </html>

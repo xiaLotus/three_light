@@ -36,7 +36,7 @@ FROM machine_status
 df = pd.read_sql(sql, engine)
 
 # 存成 CSV
-csv_path = "三色燈上拋資訊.csv"
+csv_path = "machine_status.csv"
 df.to_csv(csv_path, index=False, encoding="utf-8-sig")
 
 print(f"已輸出 {len(df)} 筆的資料到 {csv_path}")
