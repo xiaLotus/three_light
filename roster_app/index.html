@@ -1,0 +1,901 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>營運組值班排班管理系統</title>
+<script>
+  // 守門：未登入（無 dsm_login）→ 在主頁面渲染前先導回登入頁
+  try { if (!sessionStorage.getItem('dsm_login')) location.replace('login.html'); }
+  catch (e) { location.replace('login.html'); }
+</script>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-icons/1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<!-- 登入已獨立為 login.html；未登入會在 <head> 守門腳本導回 -->
+
+
+<!-- SIDEBAR -->
+<nav id="sidebar">
+  <div class="sidebar-brand">
+    <div class="brand-icon">FT</div>
+    <div class="brand-text">
+      <div class="name">營運組排班系統</div>
+      <div class="sub">值班排班管理 · 2026</div>
+    </div>
+  </div>
+  <div class="sidebar-nav">
+    <div class="nav-section-label">主選單</div>
+    <button class="nav-item-btn active" onclick="navigate('dashboard',this)"><i class="bi bi-speedometer2"></i><span>Dashboard</span></button>
+    <button class="nav-item-btn" onclick="navigate('schedule',this)"><i class="bi bi-calendar-week-fill"></i><span>排班管理</span></button>
+    <button class="nav-item-btn" onclick="navigate('calendar',this)"><i class="bi bi-calendar3"></i><span>排班行事曆</span></button>
+    <button id="nav-personnel" class="nav-item-btn leader-only-hide" onclick="navigate('personnel',this)"><i class="bi bi-people-fill"></i><span>人員管理</span></button>
+    <button class="nav-item-btn" onclick="navigate('analysis',this)"><i class="bi bi-bar-chart-line-fill"></i><span>出勤分析</span></button>
+    <div id="nav-sys-label" class="nav-section-label leader-only-hide">系統</div>
+    <button id="nav-settings" class="nav-item-btn leader-only-hide" onclick="navigate('settings',this)"><i class="bi bi-gear-fill"></i><span>系統設定</span></button>
+  </div>
+  <div class="sidebar-footer">
+    <div class="user-card">
+      <div class="user-avatar" id="sidebar-avatar">管</div>
+      <div class="user-info">
+        <div class="user-name" id="sidebar-admin-name">系統管理員</div>
+        <div class="user-role" id="sidebar-admin-role">Admin</div>
+      </div>
+    </div>
+    <div id="sidebar-role-badge-wrap" style="margin-top:10px;display:flex;align-items:center;justify-content:space-between;gap:6px;padding:0 4px">
+      <span id="sidebar-role-badge" class="role-badge role-LEADER">
+        <i class="bi bi-shield-fill-check"></i><span id="sidebar-role-text">LEADER</span>
+      </span>
+      <button onclick="doLogout()" title="登出"
+        style="background:rgba(255,71,87,.12);color:#ff8896;border:1px solid rgba(255,71,87,.3);border-radius:6px;padding:4px 9px;font-size:11px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:4px;transition:all .15s"
+        onmouseover="this.style.background='rgba(255,71,87,.2)'" onmouseout="this.style.background='rgba(255,71,87,.12)'">
+        <i class="bi bi-box-arrow-right"></i><span class="user-info">登出</span>
+      </button>
+    </div>
+  </div>
+</nav>
+
+<!-- MAIN WRAPPER -->
+<div id="main-wrapper">
+  <!-- TOPBAR -->
+  <header id="topbar">
+    <button class="toggle-btn" onclick="toggleSidebar()"><i class="bi bi-list"></i></button>
+    <div class="topbar-title">
+      <span id="topbar-page-name">Dashboard</span>
+      <small>營運組值班排班管理系統 &nbsp;|&nbsp; <span id="topbar-date-label">載入中...</span></small>
+    </div>
+    <div class="topbar-right">
+      <!-- Month switcher — dynamic -->
+      <div style="display:flex;align-items:center;gap:6px;background:var(--main-bg);border:1px solid var(--border);border-radius:8px;padding:4px 8px;">
+        <span style="font-size:11px;font-weight:600;color:var(--text-muted)">月份</span>
+        <div id="month-btns" style="display:flex;gap:4px"></div>
+        <select id="month-archive" class="form-select form-select-sm" style="width:auto;font-size:11px;padding:3px 24px 3px 8px;border-radius:6px;border:1px solid var(--border);background:#fff;color:var(--text-muted);display:none" onchange="switchMonthByIdx(this.value)">
+        </select>
+      </div>
+      <div class="system-status"><div class="status-dot"></div><span>檢查連線...</span></div>
+      <div id="save-indicator" style="font-size:10px;color:var(--text-muted);min-width:70px;text-align:right"></div>
+      <div id="clock-display">--:--:--</div>
+      <button id="go-btn" onclick="toggleGoReport()" style="background:linear-gradient(135deg,#0098ff,#00d4ff);color:#000;border:none;border-radius:8px;padding:7px 20px;font-size:14px;font-weight:900;cursor:pointer;letter-spacing:1px;box-shadow:0 2px 12px rgba(0,212,255,.4);transition:all .2s;font-family:'JetBrains Mono',monospace;">GO</button>
+    </div>
+  </header>
+
+  <!-- ═══ 廠區分頁列（A3 / KL / 南科）═══ -->
+  <div id="site-tabs">
+    <div class="site-tabs-inner">
+      <span class="site-tabs-label"><i class="bi bi-building-fill"></i> 廠區</span>
+      <button class="site-tab active" data-site="A3" onclick="switchSite('A3')">A3</button>
+      <button class="site-tab" data-site="KL" onclick="switchSite('KL')">KL</button>
+      <button class="site-tab" data-site="NK" onclick="switchSite('NK')">南科</button>
+      <span class="site-tabs-hint">目前：<b id="current-site-label">A3</b>　各廠區資料獨立</span>
+    </div>
+  </div>
+
+  <!-- GO 出勤回報面板 -->
+  <div id="go-report-panel" style="display:none;position:fixed;top:80px;right:20px;z-index:1200;width:300px;">
+    <div style="background:#0a0e1a;border:1px solid #1e2d50;border-radius:12px;overflow:hidden;box-shadow:0 8px 40px rgba(0,0,0,.55);font-family:'Noto Sans TC',sans-serif;">
+      <!-- Panel header -->
+      <div style="background:linear-gradient(135deg,#0f1628,#172040);padding:12px 16px;border-bottom:1px solid #1e2d50;display:flex;align-items:center;justify-content:space-between;">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <div style="width:8px;height:8px;border-radius:50%;background:#00ff88;box-shadow:0 0 6px #00ff88;"></div>
+          <span id="go-header-text" style="font-size:13px;font-weight:700;color:#fff;font-family:'JetBrains Mono',monospace;letter-spacing:.5px;">—</span>
+        </div>
+        <button onclick="closeGoReport()" style="background:none;border:none;color:rgba(255,255,255,.4);font-size:18px;cursor:pointer;line-height:1;padding:0 4px;">×</button>
+      </div>
+      <!-- Shift selector row -->
+      <div style="padding:10px 16px 8px;border-bottom:1px solid #1e2d50;">
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px">
+          <span style="font-size:10px;color:rgba(255,255,255,.35);align-self:center;margin-right:2px;">主要</span>
+          <button class="go-shift-btn active" onclick="selectGoShift('DAY')" id="go-s-DAY">早班</button>
+          <button class="go-shift-btn" onclick="selectGoShift('NIGHT')" id="go-s-NIGHT">夜班</button>
+          <button class="go-shift-btn" onclick="selectGoShift('ALL')" id="go-s-ALL">全部</button>
+        </div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;">
+          <span style="font-size:10px;color:rgba(255,255,255,.35);align-self:center;margin-right:2px;">細項</span>
+          <button class="go-shift-btn" onclick="selectGoShift('4A')" id="go-s-4A">4A</button>
+          <button class="go-shift-btn" onclick="selectGoShift('4B')" id="go-s-4B">4B</button>
+          <button class="go-shift-btn" onclick="selectGoShift('5A')" id="go-s-5A">5A</button>
+          <button class="go-shift-btn" onclick="selectGoShift('5B')" id="go-s-5B">5B</button>
+        </div>
+      </div>
+      <!-- Report body -->
+      <div id="go-report-body" style="padding:14px 16px;"></div>
+      <!-- Copy button -->
+      <div style="padding:10px 16px 14px;">
+        <button onclick="copyGoReport()" style="width:100%;background:rgba(0,212,255,.1);border:1px solid rgba(0,212,255,.3);color:#00d4ff;border-radius:7px;padding:8px;font-size:12px;font-weight:700;cursor:pointer;transition:all .2s;" onmouseover="this.style.background='rgba(0,212,255,.2)'" onmouseout="this.style.background='rgba(0,212,255,.1)'">
+          <i class="bi bi-clipboard-fill"></i>&nbsp; 複製回報文字
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- CONTENT -->
+  <main id="content">
+
+    <!-- ═══ DASHBOARD ═══ -->
+    <div class="page active" id="page-dashboard">
+      <div class="page-header">
+        <div>
+          <div class="breadcrumb-nav"><i class="bi bi-house"></i> / <span>Dashboard</span></div>
+          <h2>值班概況儀表板</h2>
+          <p id="dash-sub-label">營運組 · 2026年 值班排班統計</p>
+        </div>
+      </div>
+
+      <!-- 最後修改 / Leader 在線狀態列 -->
+      <div id="dash-info-bar" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:18px">
+        <!-- 最後修改 -->
+        <div style="flex:1;min-width:260px;background:#fff;border:1px solid var(--border);border-radius:var(--radius);padding:14px 18px;display:flex;align-items:center;gap:14px;box-shadow:var(--shadow)">
+          <div style="width:42px;height:42px;border-radius:10px;background:rgba(0,212,255,.1);color:var(--accent);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0"><i class="bi bi-clock-history"></i></div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:11px;font-weight:700;color:var(--text-muted);letter-spacing:.6px;text-transform:uppercase">最後修改時間</div>
+            <div style="font-size:14px;font-weight:700;color:var(--text-dark);font-family:'JetBrains Mono',monospace;margin-top:2px" id="dash-last-modified">—</div>
+            <div style="font-size:11px;color:var(--text-muted);margin-top:2px">修改者：<span id="dash-last-modified-by" style="font-weight:600;color:var(--text-dark)">—</span></div>
+          </div>
+        </div>
+        <!-- 目前 Leader 在線 -->
+        <div style="flex:1;min-width:260px;background:#fff;border:1px solid var(--border);border-radius:var(--radius);padding:14px 18px;display:flex;align-items:center;gap:14px;box-shadow:var(--shadow)">
+          <div id="dash-leader-icon" style="width:42px;height:42px;border-radius:10px;background:rgba(123,94,167,.12);color:var(--accent2);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0"><i class="bi bi-shield-fill-check"></i></div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:11px;font-weight:700;color:var(--text-muted);letter-spacing:.6px;text-transform:uppercase">Leader 編輯權限</div>
+            <div style="font-size:14px;font-weight:700;color:var(--text-dark);margin-top:2px" id="dash-leader-status">尚未有人持有</div>
+            <div style="font-size:11px;color:var(--text-muted);margin-top:2px" id="dash-leader-since">—</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Stat cards - 5 cards (一排 5 張，lg 以上不換行) -->
+      <div class="row row-cols-2 row-cols-md-3 row-cols-lg-5 g-3 mb-4 dash-stats">
+        <div class="col">
+          <div class="stat-card stat-blue" style="cursor:pointer" onclick="navigate('personnel',document.querySelector('.nav-item[data-page=personnel]'))" title="點擊前往人員管理">
+            <div class="card-icon"><i class="bi bi-people-fill"></i></div>
+            <div class="card-value" id="stat-total">64</div>
+            <div class="card-label">總人員數</div>
+            <div class="card-sub" id="stat-total-sub">四班 12 小組 + 保養組 8</div>
+          </div>
+        </div>
+
+        <!-- 今日出席率（依目前班別計算）-->
+        <div class="col">
+          <div class="stat-card stat-green" style="border-top:2px solid var(--success)">
+            <div class="card-icon" style="background:rgba(0,255,136,.1);color:var(--accent3)"><i class="bi bi-percent"></i></div>
+            <div class="card-value" id="stat-attend-rate" style="color:#00c570">—</div>
+            <div class="card-label">今日出席率 <span id="stat-attend-shift-tag" style="background:rgba(0,212,255,.15);color:#0095b3;font-size:10px;font-weight:700;padding:1px 6px;border-radius:8px;margin-left:4px">—</span></div>
+            <div class="card-sub" id="stat-attend-formula">（當班+加班−請假）÷（當班+加班）</div>
+          </div>
+        </div>
+
+        <!-- 今日當班（早班 4A/4B、夜班 5A/5B）-->
+        <div class="col">
+          <div class="stat-card stat-green" style="cursor:pointer" onclick="openDashRoster('ON')" title="點擊查看當班名單">
+            <div class="card-icon"><i class="bi bi-person-check-fill"></i></div>
+            <div class="card-value" id="stat-onduty">—</div>
+            <div class="card-label">今日當班</div>
+            <div style="margin-top:8px;padding-top:8px;border-top:1px dashed var(--border);display:flex;flex-direction:column;gap:4px">
+              <div class="shift-mini-row" style="display:flex;align-items:center;gap:6px;background:rgba(0,212,255,.08);border-radius:6px;padding:4px 8px">
+                <span style="color:#0095b3;font-weight:800;min-width:28px">早班</span>
+                <span style="color:#0095b3;flex:1">4A <b id="stat-onduty-4A" style="font-family:'JetBrains Mono'">0</b> · 4B <b id="stat-onduty-4B" style="font-family:'JetBrains Mono'">0</b></span>
+                <span style="font-size:13px;font-weight:800;color:#0095b3;font-family:'JetBrains Mono'" id="stat-onduty-day">0</span>
+              </div>
+              <div class="shift-mini-row" style="display:flex;align-items:center;gap:6px;background:rgba(123,94,167,.08);border-radius:6px;padding:4px 8px">
+                <span style="color:#6a4f8c;font-weight:800;min-width:28px">夜班</span>
+                <span style="color:#6a4f8c;flex:1">5A <b id="stat-onduty-5A" style="font-family:'JetBrains Mono'">0</b> · 5B <b id="stat-onduty-5B" style="font-family:'JetBrains Mono'">0</b></span>
+                <span style="font-size:13px;font-weight:800;color:#6a4f8c;font-family:'JetBrains Mono'" id="stat-onduty-night">0</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 今日加班（OT，早/夜班 + 細項）-->
+        <div class="col">
+          <div class="stat-card stat-purple" style="cursor:pointer" onclick="openDashRoster('OT')" title="點擊查看加班名單">
+            <div class="card-icon"><i class="bi bi-clock-history"></i></div>
+            <div class="card-value" id="stat-ot">—</div>
+            <div class="card-label">今日加班（OT）</div>
+            <div style="margin-top:8px;padding-top:8px;border-top:1px dashed var(--border);display:flex;flex-direction:column;gap:4px">
+              <div class="shift-mini-row" style="display:flex;align-items:center;gap:6px;background:rgba(0,212,255,.08);border-radius:6px;padding:4px 8px">
+                <span style="color:#0095b3;font-weight:800;min-width:28px">早班</span>
+                <span style="color:#0095b3;flex:1">4A <b id="stat-ot-4A" style="font-family:'JetBrains Mono'">0</b> · 4B <b id="stat-ot-4B" style="font-family:'JetBrains Mono'">0</b></span>
+                <span style="font-size:13px;font-weight:800;color:#0095b3;font-family:'JetBrains Mono'" id="stat-ot-day">0</span>
+              </div>
+              <div class="shift-mini-row" style="display:flex;align-items:center;gap:6px;background:rgba(123,94,167,.08);border-radius:6px;padding:4px 8px">
+                <span style="color:#6a4f8c;font-weight:800;min-width:28px">夜班</span>
+                <span style="color:#6a4f8c;flex:1">5A <b id="stat-ot-5A" style="font-family:'JetBrains Mono'">0</b> · 5B <b id="stat-ot-5B" style="font-family:'JetBrains Mono'">0</b></span>
+                <span style="font-size:13px;font-weight:800;color:#6a4f8c;font-family:'JetBrains Mono'" id="stat-ot-night">0</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 今日請假（早/夜班 + 細項 + 名單）-->
+        <div class="col">
+          <div class="stat-card stat-red" style="cursor:pointer" onclick="openDashRoster('LEAVE')" title="點擊查看請假名單">
+            <div class="card-icon"><i class="bi bi-calendar-x-fill"></i></div>
+            <div class="card-value" id="stat-leave">—</div>
+            <div class="card-label">今日請假</div>
+            <div style="margin-top:8px;padding-top:8px;border-top:1px dashed var(--border);display:flex;flex-direction:column;gap:4px">
+              <div class="shift-mini-row" style="display:flex;align-items:center;gap:6px;background:rgba(0,212,255,.08);border-radius:6px;padding:4px 8px">
+                <span style="color:#0095b3;font-weight:800;min-width:28px">早班</span>
+                <span style="color:#0095b3;flex:1">4A <b id="stat-leave-4A" style="font-family:'JetBrains Mono'">0</b> · 4B <b id="stat-leave-4B" style="font-family:'JetBrains Mono'">0</b></span>
+                <span style="font-size:13px;font-weight:800;color:#0095b3;font-family:'JetBrains Mono'" id="stat-leave-day">0</span>
+              </div>
+              <div class="shift-mini-row" style="display:flex;align-items:center;gap:6px;background:rgba(123,94,167,.08);border-radius:6px;padding:4px 8px">
+                <span style="color:#6a4f8c;font-weight:800;min-width:28px">夜班</span>
+                <span style="color:#6a4f8c;flex:1">5A <b id="stat-leave-5A" style="font-family:'JetBrains Mono'">0</b> · 5B <b id="stat-leave-5B" style="font-family:'JetBrains Mono'">0</b></span>
+                <span style="font-size:13px;font-weight:800;color:#6a4f8c;font-family:'JetBrains Mono'" id="stat-leave-night">0</span>
+              </div>
+            </div>
+            <div id="stat-leave-names" style="font-size:11px;color:var(--text-muted);margin-top:6px;line-height:1.7;max-height:60px;overflow-y:auto"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Charts row 1 -->
+      <div class="row g-3 mb-3 chart-row-1">
+        <div class="col-12 col-md-4">
+          <div class="chart-card">
+            <div class="chart-title"><i class="bi bi-pie-chart-fill"></i>各班人數分佈</div>
+            <div class="chart-sub">4A / 5A / 4B / 5B（含各班人數）</div>
+            <div class="chart-canvas-wrap"><canvas id="ch-pie"></canvas></div>
+          </div>
+        </div>
+        <div class="col-12 col-md-8">
+          <div class="chart-card">
+            <div class="chart-title"><i class="bi bi-bar-chart-fill"></i>各小組人數統計</div>
+            <div class="chart-sub">12 個小組分佈</div>
+            <div class="chart-canvas-wrap"><canvas id="ch-bar"></canvas></div>
+            <!-- shift label row below bar chart -->
+            <div id="ch-bar-shift-labels" style="display:flex;justify-content:space-around;margin-top:10px;padding-top:8px;border-top:1px solid var(--border);flex-shrink:0"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Charts row 2 + today lists -->
+      <div class="row g-3 chart-row-2">
+        <div class="col-12 col-md-4">
+          <div class="chart-card">
+            <div class="chart-title"><i class="bi bi-graph-up"></i>六月加班天數 TOP 10</div>
+            <div class="chart-sub">各人員 OT 統計（休假日出勤）</div>
+            <div class="chart-canvas-wrap"><canvas id="ch-ot"></canvas></div>
+          </div>
+        </div>
+        <div class="col-12 col-md-4">
+          <div class="chart-card" style="min-height:0">
+            <div class="chart-title"><i class="bi bi-person-lines-fill"></i>今日 / 加班值班名單</div>
+            <div class="chart-sub">當日出勤（當班＋加班 OT）人員</div>
+            <div id="today-list" style="overflow-y:auto;max-height:270px;"></div>
+          </div>
+        </div>
+        <div class="col-12 col-md-4">
+          <div class="chart-card" style="min-height:0">
+            <div class="chart-title"><i class="bi bi-info-circle-fill"></i>出勤顏色圖例</div>
+            <div class="chart-sub">班表顏色說明</div>
+            <div style="margin-top:8px">
+              <div class="legend-row"><div class="legend-dot" style="background:rgba(26,31,54,.15);border:1px solid #ccc"></div><strong>當班（白）</strong> — 正常出勤值班日</div>
+              <div class="legend-row"><div class="legend-dot" style="background:rgba(255,165,2,.5)"></div><strong>休息日（黃）</strong> — 非出勤休息日（倍率 1.34）</div>
+              <div class="legend-row"><div class="legend-dot" style="background:rgba(0,212,255,.5)"></div><strong>休假日（藍）</strong> — 預設視為加班出勤日（倍率 1.34～2.0）</div>
+              <div class="legend-row"><div class="legend-dot" style="background:rgba(255,71,87,.5)"></div><strong>例假日（紅）</strong> — 法定例假，不可出勤</div>
+            </div>
+            <hr style="margin:16px 0;border-color:var(--border)">
+            <div class="chart-title" style="margin-bottom:8px"><i class="bi bi-exclamation-triangle-fill"></i>請假規則</div>
+            <div style="font-size:12px;color:var(--text-muted);line-height:2">
+              <div><span class="stype-LEAVE" style="margin-right:6px">正常請假</span>事前寄信通知，且 <strong>三天前</strong> 於系統設定者</div>
+              <div><span class="stype-REST" style="margin-right:6px">臨時請假</span>突發狀況、<strong>未寄發信件</strong>，或 <strong>當日</strong> 於系統設定者</div>
+              <div style="margin-top:4px;color:var(--danger);font-size:11px"><i class="bi bi-exclamation-triangle-fill me-1"></i>例假日不可設定請假</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ SCHEDULE ═══ -->
+    <div class="page" id="page-schedule">
+      <div class="page-header">
+        <div>
+          <div class="breadcrumb-nav"><i class="bi bi-house"></i> / <span>排班管理</span></div>
+          <h2 id="sch-page-title">六月排班表</h2>
+          <p id="sch-page-sub">營運組 · 2026年6月 出勤預排表</p>
+        </div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+          <select id="sch-filter-shift" class="form-select form-select-sm" style="width:130px" onchange="renderSchedule()">
+            <option value="">所有班別</option>
+            <option>4A</option><option>5A</option><option>4B</option><option>5B</option>
+            <option value="__MAINT__">─ 保養組 ─</option>
+          </select>
+          <select id="sch-filter-group" class="form-select form-select-sm" style="width:100px" onchange="renderSchedule()">
+            <option value="">所有小組</option>
+            <option>A1</option><option>A2</option><option>A3</option>
+            <option>Z1</option><option>Z2</option><option>Z3</option>
+            <option>C1</option><option>C2</option><option>C3</option>
+            <option>X1</option><option>X2</option><option>X3</option>
+          </select>
+          <!-- 截圖工具列 -->
+          <div style="display:flex;align-items:center;gap:6px;background:rgba(0,212,255,.06);border:1px solid rgba(0,212,255,.25);border-radius:8px;padding:3px 6px 3px 10px">
+            <i class="bi bi-camera-fill" style="color:var(--accent);font-size:13px"></i>
+            <span style="font-size:11px;color:var(--accent);font-weight:700">截圖</span>
+            <select id="sch-shot-shift" class="form-select form-select-sm" style="width:110px;font-size:12px;padding:3px 24px 3px 8px;border:1px solid rgba(0,212,255,.3)" title="By 班 / 保養組 輸出">
+              <option value="4A">4A 班</option>
+              <option value="4B">4B 班</option>
+              <option value="5A">5A 班</option>
+              <option value="5B">5B 班</option>
+              <option value="__MAINT__">保養組</option>
+            </select>
+            <button class="topbar-btn" style="padding:5px 10px;font-size:11px;border-color:rgba(0,212,255,.4);color:var(--accent)" onclick="captureScheduleByShift()" title="截圖選定班別並複製/下載">
+              <i class="bi bi-clipboard-plus"></i>截圖
+            </button>
+          </div>
+          <button class="topbar-btn" onclick="openAddSchedule()" style="display:none"><i class="bi bi-plus-lg"></i>新增排班</button>
+        </div>
+      </div>
+      <div class="data-table-wrap" style="overflow-x:auto">
+        <div style="padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+          <span style="font-size:13px;font-weight:700" id="sch-table-title">六月班表（1–30日）</span>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;font-size:11px">
+            <span class="chip-ON" style="padding:2px 7px;border-radius:4px">當班</span>
+            <span class="chip-REST" style="padding:2px 7px;border-radius:4px">休息</span>
+            <span class="chip-LEAVE" style="padding:2px 7px;border-radius:4px">休假（預設加班）</span>
+            <span class="chip-HOLIDAY" style="padding:2px 7px;border-radius:4px">例假</span>
+          </div>
+          <div style="margin-left:auto;font-size:11px;color:var(--accent)"><i class="bi bi-mouse2"></i> 點擊日期格編輯</div>
+        </div>
+        <div class="sch-scroll-wrap">
+          <table class="sch-table" id="sch-table"></table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ CALENDAR ═══ -->
+    <div class="page" id="page-calendar">
+      <div class="page-header">
+        <div>
+          <div class="breadcrumb-nav"><i class="bi bi-house"></i> / <span>排班行事曆</span></div>
+          <h2 id="cal-month-title">2026年6月排班行事曆</h2>
+          <p>每日顯示早班(4A/4B)、晚班(5A/5B) 出勤人數含 OT　·　點擊日期可查看完整出勤名單</p>
+        </div>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+          <button class="topbar-btn" onclick="calPrev()"><i class="bi bi-chevron-left"></i></button>
+          <button class="topbar-btn" onclick="calNext()"><i class="bi bi-chevron-right"></i></button>
+          <select id="cal-filter-shift" class="form-select form-select-sm" style="width:130px" onchange="renderCalendar()">
+            <option value="">全部班別</option>
+            <option>4A</option><option>5A</option><option>4B</option><option>5B</option>
+            <option value="__MAINT__">─ 保養組 ─</option>
+          </select>
+          <select id="cal-filter-group" class="form-select form-select-sm" style="width:100px" onchange="renderCalendar()">
+            <option value="">全部小組</option>
+            <option>A1</option><option>A2</option><option>A3</option>
+            <option>Z1</option><option>Z2</option><option>Z3</option>
+            <option>C1</option><option>C2</option><option>C3</option>
+            <option>X1</option><option>X2</option><option>X3</option>
+          </select>
+        </div>
+      </div>
+      <div class="cal-wrap">
+        <div class="cal-header" id="cal-dow-row"></div>
+        <div class="cal-body" id="cal-body"></div>
+      </div>
+    </div>
+
+    <!-- ═══ PERSONNEL ═══ -->
+    <div class="page" id="page-personnel">
+      <div class="page-header">
+        <div>
+          <div class="breadcrumb-nav"><i class="bi bi-house"></i> / <span>人員管理</span></div>
+          <h2>值班工程師名冊</h2>
+          <p>營運組 · 共 <span id="eng-count">64</span> 人</p>
+        </div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+          <select id="per-filter-shift" class="form-select form-select-sm" style="width:130px" onchange="renderPersonnel()">
+            <option value="">所有班別</option>
+            <option>4A</option><option>5A</option><option>4B</option><option>5B</option>
+            <option value="__MAINT__">─ 保養組 ─</option>
+          </select>
+          <select id="per-filter-group" class="form-select form-select-sm" style="width:100px" onchange="renderPersonnel()">
+            <option value="">所有小組</option>
+            <option>A1</option><option>A2</option><option>A3</option>
+            <option>Z1</option><option>Z2</option><option>Z3</option>
+            <option>C1</option><option>C2</option><option>C3</option>
+            <option>X1</option><option>X2</option><option>X3</option>
+          </select>
+          <button class="topbar-btn leader-only" onclick="openAddPerson()"><i class="bi bi-person-plus-fill"></i>新增人員</button>
+        </div>
+      </div>
+      <div class="data-table-wrap">
+        <div class="table-toolbar">
+          <h5>人員資料</h5>
+          <div class="search-box"><i class="bi bi-search"></i><input id="per-search" placeholder="搜尋工號 / 姓名" oninput="renderPersonnel()"></div>
+        </div>
+        <div style="overflow-x:auto">
+          <table class="table" id="per-table">
+            <thead><tr>
+              <th>工號</th><th>姓名</th><th>班別</th><th>小組</th><th>職稱</th><th>入職日期 / 年資</th><th>廠區</th><th>備註</th>
+              <th id="per-th-ot">六月加班</th><th id="per-th-on">六月當班</th><th>總上班</th><th>操作</th>
+            </tr></thead>
+            <tbody id="per-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ ANALYSIS ═══ -->
+    <div class="page" id="page-analysis">
+      <div class="page-header">
+        <div>
+          <div class="breadcrumb-nav"><i class="bi bi-house"></i> / <span>出勤分析</span></div>
+          <h2>戰情統計分析</h2>
+          <p id="an-page-sub">2026年6月 營運組出勤統計報表</p>
+        </div>
+      </div>
+      <div class="row g-3 mb-3">
+        <div class="col-6 col-md-3"><div class="stat-card stat-blue"><div class="card-icon"><i class="bi bi-people-fill"></i></div><div class="card-value" id="an-total">64</div><div class="card-label">總人員</div></div></div>
+        <div class="col-6 col-md-3"><div class="stat-card stat-green"><div class="card-icon"><i class="bi bi-graph-up-arrow"></i></div><div class="card-value" id="an-avg-on">—</div><div class="card-label">平均當班日/人</div></div></div>
+        <div class="col-6 col-md-3"><div class="stat-card stat-purple"><div class="card-icon"><i class="bi bi-clock-history"></i></div><div class="card-value" id="an-total-ot">—</div><div class="card-label">全員OT合計(次)</div></div></div>
+        <div class="col-6 col-md-3"><div class="stat-card stat-orange"><div class="card-icon"><i class="bi bi-award-fill"></i></div><div class="card-value" id="an-top-ot">—</div><div class="card-label">OT最多人員</div></div></div>
+      </div>
+      <div class="row g-3 mb-3">
+        <div class="col-12 col-lg-6">
+          <div class="analysis-card">
+            <div class="ac-title"><i class="bi bi-bar-chart-steps"></i>各班別人數</div>
+            <div id="an-shift-list"></div>
+          </div>
+        </div>
+        <div class="col-12 col-lg-6">
+          <div class="analysis-card">
+            <div class="ac-title"><i class="bi bi-pie-chart-fill"></i>各小組人數比例</div>
+            <div id="an-group-list"></div>
+          </div>
+        </div>
+      </div>
+      <div class="row g-3">
+        <div class="col-12 col-lg-4">
+          <div class="analysis-card">
+            <div class="ac-title"><i class="bi bi-trophy-fill"></i>OT加班排行 TOP 8</div>
+            <div id="an-rank-list"></div>
+          </div>
+        </div>
+        <div class="col-12 col-lg-8">
+          <div class="chart-card" style="min-height:300px">
+            <div class="chart-title"><i class="bi bi-bar-chart-line-fill"></i>各班別當班/加班統計</div>
+            <div class="chart-sub">六月份各班人員出勤總計</div>
+            <div class="chart-canvas-wrap"><canvas id="ch-analysis"></canvas></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ SETTINGS ═══ -->
+    <div class="page" id="page-settings">
+      <div class="page-header">
+        <div>
+          <div class="breadcrumb-nav"><i class="bi bi-house"></i> / <span>系統設定</span></div>
+          <h2>系統設定</h2>
+          <p>管理系統參數與顯示選項</p>
+        </div>
+      </div>
+      <!-- 資料儲存狀態說明卡 -->
+      <div style="background:linear-gradient(135deg,rgba(0,212,255,.06),rgba(0,255,136,.04));border:1px solid rgba(0,212,255,.2);border-radius:var(--radius);padding:16px 20px;margin-bottom:20px;display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+        <div style="width:42px;height:42px;border-radius:10px;background:rgba(0,212,255,.12);display:flex;align-items:center;justify-content:center;font-size:20px;color:var(--accent);flex-shrink:0"><i class="bi bi-server"></i></div>
+        <div style="flex:1;min-width:200px">
+          <div style="font-size:14px;font-weight:700;color:var(--text-dark)">💾 伺服器即時儲存已啟用</div>
+          <div style="font-size:12px;color:var(--text-muted);margin-top:3px">所有排班變更會自動儲存至伺服器（data/ 資料夾），多人可同時存取。<br>離線時自動切換 localStorage 快取，恢復連線後同步至伺服器。</div>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap" class="leader-only">
+          <button class="topbar-btn" onclick="exportBackup()" style="border-color:rgba(0,255,136,.4);color:#00a85a"><i class="bi bi-cloud-download me-1"></i>匯出備份</button>
+          <button class="topbar-btn" onclick="importBackup()"><i class="bi bi-cloud-upload me-1"></i>匯入備份</button>
+        </div>
+      </div>
+      <div class="row g-3">
+        <div class="col-12 col-lg-6">
+          <div class="settings-section">
+            <h5><i class="bi bi-building"></i>廠區資訊</h5>
+            <div class="row g-3">
+              <div class="col-12"><label class="form-label">廠區 / 部門</label>
+                <div style="background:var(--main-bg);border:1px solid var(--border);border-radius:8px;padding:10px 14px;display:flex;align-items:center;gap:10px">
+                  <i class="bi bi-buildings-fill" style="color:var(--accent);font-size:18px"></i>
+                  <span style="font-size:14px;font-weight:700">營運組值班排班管理系統</span>
+                  <span style="margin-left:auto;font-size:11px;color:var(--text-muted);font-style:italic">固定顯示，無法修改</span>
+                </div>
+              </div>
+              <div class="col-6"><label class="form-label">值班班制</label><select class="form-select"><option>四班二輪</option><option>常日</option></select></div>
+              <div class="col-6"><label class="form-label">系統版本</label><input class="form-control" value="v3.8.1" readonly></div>
+            </div>
+          </div>
+          <div class="settings-section">
+            <h5><i class="bi bi-person-gear"></i>使用者資訊</h5>
+            <div class="row g-3">
+              <div class="col-6"><label class="form-label">管理員姓名</label><input class="form-control" id="setting-admin-name" value="系統管理員"></div>
+              <div class="col-6"><label class="form-label">員工編號</label><input class="form-control" id="setting-admin-id" value="ADM-001"></div>
+              <div class="col-12"><label class="form-label">電子郵件</label><input class="form-control" value="admin@ft01.com.tw"></div>
+            </div>
+          </div>
+        </div>
+        <div class="col-12 col-lg-6">
+          <div class="settings-section">
+            <h5><i class="bi bi-palette"></i>班表顏色說明</h5>
+            <div class="d-flex flex-column gap-2 mt-2">
+              <div class="legend-row"><div class="legend-dot" style="background:rgba(26,31,54,.15);border:1px solid #ccc"></div><strong>當班（白色）</strong> — 正常出勤值班日</div>
+              <div class="legend-row"><div class="legend-dot" style="background:rgba(255,165,2,.6)"></div><strong>休息日（黃色）</strong> — 非出勤休息日，倍率 1.34</div>
+              <div class="legend-row"><div class="legend-dot" style="background:rgba(0,212,255,.6)"></div><strong>休假日（藍色）</strong> — 預設視為加班出勤日，倍率 1.34～2.0</div>
+              <div class="legend-row"><div class="legend-dot" style="background:rgba(255,71,87,.6)"></div><strong>例假日（紅色）</strong> — 法定例假，不可出勤</div>
+            </div>
+            <hr style="margin:16px 0;border-color:var(--border)">
+            <div class="d-flex flex-column gap-2">
+              <div style="font-size:13px;font-weight:600">請假規則</div>
+              <div style="font-size:12px;color:var(--text-muted);line-height:2">
+                <div><strong>正常請假：</strong>事前寄信通知，且三天前於系統設定者</div>
+                <div><strong>臨時請假：</strong>突發狀況、未寄發信件，或當日於系統設定者</div>
+                <div><span style="color:var(--danger)">⚠ 例假日不可設定請假</span></div>
+              </div>
+            </div>
+          </div>
+          <div class="settings-section">
+            <h5><i class="bi bi-sliders"></i>介面設定</h5>
+            <div class="d-flex justify-content-between align-items-center mb-3">
+              <span style="font-size:13px;font-weight:600">即時時鐘顯示</span>
+              <div class="form-check form-switch mb-0"><input class="form-check-input" type="checkbox" checked style="cursor:pointer"></div>
+            </div>
+            <div class="d-flex justify-content-between align-items-center">
+              <span style="font-size:13px;font-weight:600">動畫效果</span>
+              <div class="form-check form-switch mb-0"><input class="form-check-input" type="checkbox" checked style="cursor:pointer"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══ 工號權限綁定（Leader 限定）═══ -->
+      <div class="settings-section leader-only" style="margin-top:16px">
+        <h5><i class="bi bi-shield-lock"></i>工號權限綁定（全廠共用）</h5>
+        <p style="font-size:12px;color:var(--text-muted);margin:-4px 0 14px;line-height:1.7">
+          <b style="color:var(--danger)">預設規則：所有工號登入皆為 ENG（唯讀）</b>，只有在此清單中被指定為
+          <b style="color:#0098ff">Leader</b> 的工號，登入時才能取得編輯權限。<br>
+          此清單為 <b>三個廠區（A3 / KL / 南科）共用</b>。被指定 Leader 者登入時需輸入 Leader 密碼，
+          且仍受各廠「同時一位 Leader」的鎖限制。
+        </p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin-bottom:14px">
+          <div style="flex:1;min-width:150px">
+            <label class="form-label">工號</label>
+            <input class="form-control" id="rb-input-id" placeholder="例：K25091" list="rb-id-suggestions" autocomplete="off">
+            <datalist id="rb-id-suggestions"></datalist>
+          </div>
+          <div style="width:150px">
+            <label class="form-label">權限</label>
+            <select class="form-select" id="rb-input-role">
+              <option value="LEADER">Leader（可編輯）</option>
+              <option value="ENG">ENG（唯讀，預設）</option>
+            </select>
+          </div>
+          <button class="btn" style="background:var(--accent);color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;padding:9px 18px" onclick="addRoleBinding()">
+            <i class="bi bi-plus-lg me-1"></i>新增 / 更新綁定
+          </button>
+        </div>
+        <div style="overflow-x:auto">
+          <table class="table" style="font-size:13px;width:100%">
+            <thead>
+              <tr>
+                <th style="text-align:left">工號</th>
+                <th style="text-align:left">姓名</th>
+                <th style="text-align:left">綁定權限</th>
+                <th style="text-align:right">操作</th>
+              </tr>
+            </thead>
+            <tbody id="rb-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="text-end mt-2 leader-only">
+        <button class="btn me-2" style="background:rgba(255,71,87,.1);color:var(--danger);border:1px solid rgba(255,71,87,.25);border-radius:8px;font-size:13px;font-weight:600;padding:10px 20px" onclick="resetAllData()">
+          <i class="bi bi-arrow-counterclockwise me-1"></i>重置為預設資料
+        </button>
+        <button class="btn me-2" style="background:rgba(0,212,255,.1);color:var(--accent);border:1px solid rgba(0,212,255,.25);border-radius:8px;font-size:13px;font-weight:600;padding:10px 20px" onclick="importBackup()">
+          <i class="bi bi-cloud-upload me-1"></i>匯入備份
+        </button>
+        <button class="btn me-2" style="background:rgba(0,255,136,.1);color:#00a85a;border:1px solid rgba(0,255,136,.25);border-radius:8px;font-size:13px;font-weight:600;padding:10px 20px" onclick="exportBackup()">
+          <i class="bi bi-cloud-download me-1"></i>匯出備份
+        </button>
+        <button class="btn" style="background:var(--accent);color:#fff;border-radius:8px;font-size:13px;font-weight:600;padding:10px 28px;border:none" onclick="saveSettings()">
+          <i class="bi bi-check2 me-1"></i>儲存設定
+        </button>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- FOOTER -->
+  <footer id="footer">
+    <div class="footer-left">&copy; 2026 <strong>營運組值班排班管理系統</strong> &nbsp;|&nbsp; Duty Shift Manager &nbsp;|&nbsp; <span style="font-family:'JetBrains Mono',monospace;font-size:11px">v3.8.1-IIS</span></div>
+    <div class="footer-right">
+      <span><i class="bi bi-database-fill-check me-1" style="color:var(--accent3)"></i>本機儲存已啟用</span>
+      <span><i class="bi bi-clock-history me-1" style="color:var(--accent)"></i>最後更新: <span id="last-update">—</span></span>
+    </div>
+  </footer>
+</div>
+
+<!-- SCHEDULE ADD/EDIT MODAL -->
+<div class="modal fade" id="scheduleModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <span class="modal-title"><i class="bi bi-calendar-plus-fill me-2"></i>新增 / 編輯排班</span>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="m-sch-idx" value="-1">
+        <div class="row g-3">
+          <div class="col-6 col-md-4"><label class="form-label">員工</label>
+            <select class="form-select" id="m-sch-person"><option value="">選擇員工</option></select>
+          </div>
+          <div class="col-6 col-md-4"><label class="form-label">日期</label>
+            <input type="date" class="form-control" id="m-sch-date" value="2026-06-01">
+          </div>
+          <div class="col-6 col-md-4"><label class="form-label">出勤類型</label>
+            <select class="form-select" id="m-sch-type" onchange="onSchTypeChange()">
+              <option value="ON">當班（白色）</option>
+              <option value="REST">休息日（黃色）</option>
+              <option value="LEAVE">休假日（藍色/OT）</option>
+              <option value="HOLIDAY">例假日（紅色）</option>
+            </select>
+          </div>
+          <div class="col-6 col-md-4"><label class="form-label">工作地點</label>
+            <select class="form-select" id="m-sch-loc">
+              <option>5F</option><option>8F</option><option>K21</option><option>K25</option><option>K18</option><option>系統</option><option>加</option>
+            </select>
+          </div>
+          <div class="col-6 col-md-4"><label class="form-label">是否請假</label>
+            <select class="form-select" id="m-sch-leave" onchange="onSchLeaveChange()">
+              <option value="0">否</option><option value="1">是（10H）</option>
+            </select>
+          </div>
+          <div class="col-6 col-md-4"><label class="form-label">是否加班 OT</label>
+            <select class="form-select" id="m-sch-ot">
+              <option value="0">否</option><option value="1">是（OT）</option>
+            </select>
+          </div>
+          <div class="col-6 col-md-4" id="m-sch-leave-type-wrap" style="display:none">
+            <label class="form-label">請假類型</label>
+            <select class="form-select" id="m-sch-leave-type">
+              <option value="0">正常請假（事前3天+寄信）</option>
+              <option value="1">臨時請假（當日/未寄信）</option>
+            </select>
+          </div>
+          <div class="col-12" id="m-leave-note" style="display:none">
+            <div style="background:rgba(255,165,2,.08);border:1px solid rgba(255,165,2,.3);border-radius:8px;padding:12px;font-size:12px;color:#b37400">
+              <i class="bi bi-exclamation-triangle-fill me-1"></i>請假模式：系統自動計為 <strong>10H</strong>；僅當「請假類型」為 <strong>臨時請假</strong> 時，後台才加註「臨」字樣
+            </div>
+          </div>
+          <div class="col-12" id="m-holiday-warn" style="display:none">
+            <div style="background:rgba(255,71,87,.08);border:1px solid rgba(255,71,87,.3);border-radius:8px;padding:12px;font-size:12px;color:var(--danger)">
+              <i class="bi bi-x-circle-fill me-1"></i>例假日不可設定請假！
+            </div>
+          </div>
+          <div class="col-12"><label class="form-label">備註</label><input class="form-control" id="m-sch-remark" placeholder="備註（選填）"></div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-sm" style="background:var(--main-bg);color:var(--text-muted);border:1px solid var(--border);border-radius:8px;padding:8px 20px" data-bs-dismiss="modal">取消</button>
+        <button class="btn btn-sm" style="background:var(--accent);color:#000;border-radius:8px;padding:8px 24px;font-weight:700;border:none" onclick="saveSchedule()">
+          <i class="bi bi-check2 me-1"></i>儲存
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- PERSON ADD/EDIT MODAL -->
+<div class="modal fade" id="personModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <span class="modal-title"><i class="bi bi-person-plus-fill me-2"></i><span id="per-modal-title">新增人員</span></span>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="per-edit-idx" value="-1">
+        <div class="row g-3">
+          <div class="col-6"><label class="form-label">工號 *</label><input class="form-control" id="p-id" placeholder="K12345"></div>
+          <div class="col-6"><label class="form-label">姓名 *</label><input class="form-control" id="p-name"></div>
+          <div class="col-6"><label class="form-label">班別 *</label>
+            <select class="form-select" id="p-shift" onchange="updateGroupSel()">
+              <option>4A</option><option>5A</option><option>4B</option><option>5B</option>
+            </select>
+          </div>
+          <div class="col-6"><label class="form-label">小組 *</label><select class="form-select" id="p-group"></select></div>
+          <div class="col-6"><label class="form-label">職稱</label>
+            <select class="form-select" id="p-title">
+              <option>見習工程師</option><option>工程師</option><option>資深工程師</option><option>CIM設備組長</option><option>保養組</option>
+            </select>
+          </div>
+          <div class="col-6"><label class="form-label">入職日期</label>
+            <input class="form-control" id="p-hiredate" type="date" oninput="calcSeniority()" placeholder="入職日期">
+            <div style="font-size:11px;color:var(--accent);margin-top:4px" id="p-seniority-display">年資：—</div>
+            <input type="hidden" id="p-seniority" value="0">
+          </div>
+          <div class="col-6"><label class="form-label">廠區</label>
+            <select class="form-select" id="p-factory">
+              <option value="A3">A3</option><option value="KL">KL</option><option value="NK">南科</option>
+            </select>
+          </div>
+          <div class="col-12"><label class="form-label">備註</label><input class="form-control" id="p-note" placeholder="備註（選填）"></div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-sm" style="background:var(--main-bg);color:var(--text-muted);border:1px solid var(--border);border-radius:8px;padding:8px 20px" data-bs-dismiss="modal">取消</button>
+        <button class="btn btn-sm" style="background:var(--accent);color:#000;border-radius:8px;padding:8px 24px;font-weight:700;border:none" onclick="savePerson()">
+          <i class="bi bi-check2 me-1"></i>儲存
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- DELETE CONFIRM -->
+<div class="modal fade" id="deleteModal" tabindex="-1">
+  <div class="modal-dialog modal-sm modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header" style="background:var(--danger)">
+        <span class="modal-title"><i class="bi bi-exclamation-triangle-fill me-2"></i>確認刪除</span>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" style="filter:invert(1);opacity:.7"></button>
+      </div>
+      <div class="modal-body" style="padding:24px;text-align:center">
+        <div style="width:56px;height:56px;border-radius:50%;background:rgba(255,71,87,.1);display:flex;align-items:center;justify-content:center;margin:0 auto 12px;font-size:26px;color:var(--danger)"><i class="bi bi-trash3-fill"></i></div>
+        <div style="font-size:15px;font-weight:700;margin-bottom:6px">確定要刪除此人員嗎？</div>
+        <div style="font-size:13px;color:var(--text-muted)">此操作無法復原</div>
+        <div style="background:var(--main-bg);border-radius:10px;padding:12px;margin-top:14px">
+          <div style="font-size:13px;font-weight:700" id="del-name">—</div>
+          <div style="font-size:12px;color:var(--text-muted);margin-top:3px"><span id="del-id"></span></div>
+        </div>
+      </div>
+      <div class="modal-footer" style="padding:12px 20px">
+        <button class="btn btn-sm" style="background:var(--main-bg);color:var(--text-muted);border:1px solid var(--border);border-radius:8px;padding:8px 18px" data-bs-dismiss="modal">取消</button>
+        <button class="btn btn-sm" style="background:var(--danger);color:#fff;border-radius:8px;padding:8px 22px;font-weight:600;border:none" onclick="executeDelete()">
+          <i class="bi bi-trash3-fill me-1"></i>確認刪除
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- DAY EDIT MODAL -->
+<div class="modal fade" id="dayEditModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered" style="max-width:480px">
+    <div class="modal-content">
+      <div class="modal-header">
+        <span class="modal-title"><i class="bi bi-pencil-square me-2"></i><span id="day-modal-title">編輯排班</span></span>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div id="day-modal-info" style="background:var(--main-bg);border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:13px;display:flex;align-items:center;gap:12px">
+          <div class="tbl-avatar-placeholder" id="day-modal-avatar">—</div>
+          <div>
+            <div style="font-weight:700" id="day-modal-name">—</div>
+            <div style="font-size:11px;color:var(--text-muted)" id="day-modal-meta">—</div>
+          </div>
+          <div style="margin-left:auto;text-align:right">
+            <div style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;color:var(--accent)" id="day-modal-date">—</div>
+            <div style="font-size:11px;color:var(--text-muted)" id="day-modal-dow">—</div>
+          </div>
+        </div>
+        <input type="hidden" id="day-eng-id">
+        <input type="hidden" id="day-date-key">
+        <div class="row g-3">
+          <div class="col-6">
+            <label class="form-label">出勤類型</label>
+            <select class="form-select" id="day-type" onchange="onDayTypeChange()">
+              <option value="ON">當班（白）</option>
+              <option value="REST">休息日（黃）</option>
+              <option value="LEAVE">休假日（預設加班）</option>
+              <option value="HOLIDAY">例假日（紅）</option>
+            </select>
+          </div>
+          <div class="col-6">
+            <label class="form-label">工作地點</label>
+            <select class="form-select" id="day-loc">
+              <option>5F</option><option>8F</option><option>K21</option><option>K25</option><option>K18</option><option>系統</option><option>加</option>
+            </select>
+          </div>
+          <div class="col-6">
+            <label class="form-label">是否請假</label>
+            <select class="form-select" id="day-leave" onchange="onDayLeaveChange()">
+              <option value="0">否</option>
+              <option value="1">是（10H）</option>
+            </select>
+          </div>
+          <div class="col-6" id="day-leave-type-wrap" style="display:none">
+            <label class="form-label">請假類型</label>
+            <select class="form-select" id="day-leave-type">
+              <option value="0">正常請假（事前3天+寄信）</option>
+              <option value="1">臨時請假（當日/未寄信）</option>
+            </select>
+          </div>
+          <div class="col-6">
+            <label class="form-label">加班OT</label>
+            <select class="form-select" id="day-ot">
+              <option value="0">否</option>
+              <option value="1">是（OT）</option>
+            </select>
+          </div>
+          <div class="col-12" id="day-leave-note" style="display:none">
+            <div style="background:rgba(255,165,2,.08);border:1px solid rgba(255,165,2,.3);border-radius:8px;padding:10px 12px;font-size:12px;color:#b37400">
+              <i class="bi bi-exclamation-triangle-fill me-1"></i>請假：系統自動計為 <strong>10H</strong>；僅當「請假類型」為 <strong>臨時請假</strong> 時，後台才加註「臨」字樣
+            </div>
+          </div>
+          <div class="col-12" id="day-holiday-warn" style="display:none">
+            <div style="background:rgba(255,71,87,.08);border:1px solid rgba(255,71,87,.3);border-radius:8px;padding:10px 12px;font-size:12px;color:var(--danger)">
+              <i class="bi bi-x-circle-fill me-1"></i>例假日不可設定請假！
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer" style="justify-content:space-between">
+        <button class="btn btn-sm" style="background:rgba(255,71,87,.1);color:var(--danger);border:1px solid rgba(255,71,87,.2);border-radius:8px;padding:7px 16px;font-size:12px" onclick="resetDayToCalendar()">
+          <i class="bi bi-arrow-counterclockwise me-1"></i>還原行事曆預設
+        </button>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-sm" style="background:var(--main-bg);color:var(--text-muted);border:1px solid var(--border);border-radius:8px;padding:8px 18px" data-bs-dismiss="modal">取消</button>
+          <button class="btn btn-sm" style="background:var(--accent);color:#000;border-radius:8px;padding:8px 22px;font-weight:700;border:none" onclick="saveDayEdit()">
+            <i class="bi bi-check2 me-1"></i>儲存
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ROSTER MODAL (當日完整出勤名單) — 純 CSS 控制，不使用 Bootstrap Modal -->
+<div id="rosterModal" style="display:none;position:fixed;inset:0;z-index:1055;background:rgba(0,0,0,.55);align-items:center;justify-content:center;padding:16px;">
+  <div style="background:#fff;border-radius:14px;width:100%;max-width:760px;max-height:88vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.3);overflow:hidden;">
+    <div class="modal-header" style="flex-shrink:0">
+      <span class="modal-title">
+        <i class="bi bi-people-fill me-2"></i>當日出勤名單 ·
+        <span id="roster-date" style="color:var(--accent);margin-left:6px"></span>
+        <span id="roster-dow" style="font-size:12px;font-weight:400;color:rgba(255,255,255,.7);margin-left:6px"></span>
+      </span>
+      <button type="button" class="btn-close" onclick="closeRosterModal()" style="filter:invert(1);opacity:.7"></button>
+    </div>
+    <div class="modal-body" id="roster-body" style="background:var(--main-bg);overflow-y:auto;flex:1;">
+      <input type="hidden" id="roster-hidden-date">
+    </div>
+    <div class="modal-footer" style="flex-shrink:0;justify-content:space-between">
+      <div style="font-size:11px;color:var(--text-muted)">
+        <span class="roster-person" style="font-size:10px;padding:2px 6px"><span style="color:#6a4f8c;font-weight:700">OT</span>加班</span>
+        <span class="roster-person leave" style="font-size:10px;padding:2px 6px"><span style="color:#0095b3;font-weight:700">假</span>正常請假</span>
+        <span class="roster-person leave" style="font-size:10px;padding:2px 6px"><span style="color:#b37400;font-weight:700">臨</span>臨時請假</span>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-sm" style="background:var(--main-bg);color:var(--text-muted);border:1px solid var(--border);border-radius:8px;padding:8px 18px" onclick="closeRosterModal()">關閉</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast-container" id="toast-container"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

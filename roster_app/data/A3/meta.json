@@ -1,0 +1,10 @@
+{
+  "config": {
+    "adminName": "系統管理員",
+    "adminId": "ADM-001"
+  },
+  "savedAt": "2026-06-09T14:38:51.784Z",
+  "savedBy": "李組長",
+  "savedRole": "LEADER",
+  "version": "4.0.0"
+}

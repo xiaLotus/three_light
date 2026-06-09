@@ -1,0 +1,2030 @@
+{
+  "site": "A3",
+  "year": 2026,
+  "month": 9,
+  "ym": "202609",
+  "shifts": {
+    "4A": [
+      {
+        "id": "K25091",
+        "name": "李建勳",
+        "shift": "4A",
+        "group": "A1",
+        "title": "保養組",
+        "seniority": 1,
+        "note": "保養組",
+        "isMaintenance": true,
+        "days": {
+          "10": {
+            "date": "2026-09-10",
+            "type": "REST",
+            "typeLabel": "休息",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 0
+          },
+          "11": {
+            "date": "2026-09-11",
+            "type": "LEAVE",
+            "typeLabel": "加班日",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 1
+          },
+          "12": {
+            "date": "2026-09-12",
+            "type": "HOLIDAY",
+            "typeLabel": "例假",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 0
+          },
+          "13": {
+            "date": "2026-09-13",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 0
+          },
+          "14": {
+            "date": "2026-09-14",
+            "type": "LEAVE",
+            "typeLabel": "加班日",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 1
+          },
+          "15": {
+            "date": "2026-09-15",
+            "type": "LEAVE",
+            "typeLabel": "加班日",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 1
+          },
+          "16": {
+            "date": "2026-09-16",
+            "type": "REST",
+            "typeLabel": "休息",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 0
+          },
+          "17": {
+            "date": "2026-09-17",
+            "type": "HOLIDAY",
+            "typeLabel": "例假",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 0
+          },
+          "18": {
+            "date": "2026-09-18",
+            "type": "LEAVE",
+            "typeLabel": "加班日",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 1
+          },
+          "19": {
+            "date": "2026-09-19",
+            "type": "LEAVE",
+            "typeLabel": "加班日",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 1
+          },
+          "20": {
+            "date": "2026-09-20",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 0
+          },
+          "21": {
+            "date": "2026-09-21",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 0
+          },
+          "22": {
+            "date": "2026-09-22",
+            "type": "LEAVE",
+            "typeLabel": "加班日",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 1
+          },
+          "23": {
+            "date": "2026-09-23",
+            "type": "LEAVE",
+            "typeLabel": "加班日",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 1
+          },
+          "24": {
+            "date": "2026-09-24",
+            "type": "HOLIDAY",
+            "typeLabel": "例假",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 0
+          },
+          "25": {
+            "date": "2026-09-25",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 0
+          },
+          "26": {
+            "date": "2026-09-26",
+            "type": "LEAVE",
+            "typeLabel": "加班日",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 1
+          },
+          "27": {
+            "date": "2026-09-27",
+            "type": "LEAVE",
+            "typeLabel": "加班日",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 1
+          },
+          "28": {
+            "date": "2026-09-28",
+            "type": "REST",
+            "typeLabel": "休息",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 0
+          },
+          "29": {
+            "date": "2026-09-29",
+            "type": "HOLIDAY",
+            "typeLabel": "例假",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 0
+          },
+          "30": {
+            "date": "2026-09-30",
+            "type": "LEAVE",
+            "typeLabel": "加班日",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 1
+          },
+          "01": {
+            "date": "2026-09-01",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 0
+          },
+          "02": {
+            "date": "2026-09-02",
+            "type": "LEAVE",
+            "typeLabel": "加班日",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 1
+          },
+          "03": {
+            "date": "2026-09-03",
+            "type": "LEAVE",
+            "typeLabel": "加班日",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 1
+          },
+          "04": {
+            "date": "2026-09-04",
+            "type": "REST",
+            "typeLabel": "休息",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 0
+          },
+          "05": {
+            "date": "2026-09-05",
+            "type": "HOLIDAY",
+            "typeLabel": "例假",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 0
+          },
+          "06": {
+            "date": "2026-09-06",
+            "type": "LEAVE",
+            "typeLabel": "加班日",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 1
+          },
+          "07": {
+            "date": "2026-09-07",
+            "type": "LEAVE",
+            "typeLabel": "加班日",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 1
+          },
+          "08": {
+            "date": "2026-09-08",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 0
+          },
+          "09": {
+            "date": "2026-09-09",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 0
+          }
+        }
+      },
+      {
+        "id": "K25386",
+        "name": "邱泓叡",
+        "shift": "4A",
+        "group": "A1",
+        "title": "保養組",
+        "seniority": 1,
+        "note": "保養組",
+        "isMaintenance": true,
+        "days": {
+          "10": {
+            "date": "2026-09-10",
+            "type": "LEAVE",
+            "typeLabel": "加班日",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 1
+          },
+          "11": {
+            "date": "2026-09-11",
+            "type": "HOLIDAY",
+            "typeLabel": "例假",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 0
+          },
+          "12": {
+            "date": "2026-09-12",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 0
+          },
+          "13": {
+            "date": "2026-09-13",
+            "type": "LEAVE",
+            "typeLabel": "加班日",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 1
+          },
+          "14": {
+            "date": "2026-09-14",
+            "type": "LEAVE",
+            "typeLabel": "加班日",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 1
+          },
+          "15": {
+            "date": "2026-09-15",
+            "type": "LEAVE",
+            "typeLabel": "加班日",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 1
+          },
+          "16": {
+            "date": "2026-09-16",
+            "type": "REST",
+            "typeLabel": "休息",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 0
+          },
+          "17": {
+            "date": "2026-09-17",
+            "type": "HOLIDAY",
+            "typeLabel": "例假",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 0
+          },
+          "18": {
+            "date": "2026-09-18",
+            "type": "LEAVE",
+            "typeLabel": "加班日",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 1
+          },
+          "19": {
+            "date": "2026-09-19",
+            "type": "LEAVE",
+            "typeLabel": "加班日",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 1
+          },
+          "20": {
+            "date": "2026-09-20",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 0
+          },
+          "21": {
+            "date": "2026-09-21",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 0
+          },
+          "22": {
+            "date": "2026-09-22",
+            "type": "LEAVE",
+            "typeLabel": "加班日",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 1
+          },
+          "23": {
+            "date": "2026-09-23",
+            "type": "LEAVE",
+            "typeLabel": "加班日",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 1
+          },
+          "24": {
+            "date": "2026-09-24",
+            "type": "HOLIDAY",
+            "typeLabel": "例假",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 0
+          },
+          "25": {
+            "date": "2026-09-25",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 0
+          },
+          "26": {
+            "date": "2026-09-26",
+            "type": "LEAVE",
+            "typeLabel": "加班日",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 1
+          },
+          "27": {
+            "date": "2026-09-27",
+            "type": "LEAVE",
+            "typeLabel": "加班日",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 1
+          },
+          "28": {
+            "date": "2026-09-28",
+            "type": "REST",
+            "typeLabel": "休息",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 0
+          },
+          "29": {
+            "date": "2026-09-29",
+            "type": "HOLIDAY",
+            "typeLabel": "例假",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 0
+          },
+          "30": {
+            "date": "2026-09-30",
+            "type": "LEAVE",
+            "typeLabel": "加班日",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 1
+          },
+          "01": {
+            "date": "2026-09-01",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 0
+          },
+          "02": {
+            "date": "2026-09-02",
+            "type": "LEAVE",
+            "typeLabel": "加班日",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 1
+          },
+          "03": {
+            "date": "2026-09-03",
+            "type": "LEAVE",
+            "typeLabel": "加班日",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 1
+          },
+          "04": {
+            "date": "2026-09-04",
+            "type": "REST",
+            "typeLabel": "休息",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 0
+          },
+          "05": {
+            "date": "2026-09-05",
+            "type": "HOLIDAY",
+            "typeLabel": "例假",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 0
+          },
+          "06": {
+            "date": "2026-09-06",
+            "type": "LEAVE",
+            "typeLabel": "加班日",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 1
+          },
+          "07": {
+            "date": "2026-09-07",
+            "type": "LEAVE",
+            "typeLabel": "加班日",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 1
+          },
+          "08": {
+            "date": "2026-09-08",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 0
+          },
+          "09": {
+            "date": "2026-09-09",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 0
+          }
+        }
+      },
+      {
+        "id": "K25130",
+        "name": "黃育暉",
+        "shift": "4A",
+        "group": "A2",
+        "title": "保養組",
+        "seniority": 1,
+        "note": "保養組",
+        "isMaintenance": true,
+        "days": {
+          "10": {
+            "date": "2026-09-10",
+            "type": "LEAVE",
+            "typeLabel": "加班日",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 1
+          },
+          "11": {
+            "date": "2026-09-11",
+            "type": "LEAVE",
+            "typeLabel": "加班日",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 1
+          },
+          "12": {
+            "date": "2026-09-12",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 0
+          },
+          "13": {
+            "date": "2026-09-13",
+            "type": "REST",
+            "typeLabel": "休息",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 0
+          },
+          "14": {
+            "date": "2026-09-14",
+            "type": "LEAVE",
+            "typeLabel": "加班日",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 1
+          },
+          "15": {
+            "date": "2026-09-15",
+            "type": "LEAVE",
+            "typeLabel": "加班日",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 1
+          },
+          "16": {
+            "date": "2026-09-16",
+            "type": "LEAVE",
+            "typeLabel": "加班日",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 1
+          },
+          "17": {
+            "date": "2026-09-17",
+            "type": "HOLIDAY",
+            "typeLabel": "例假",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 0
+          },
+          "18": {
+            "date": "2026-09-18",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 0
+          },
+          "19": {
+            "date": "2026-09-19",
+            "type": "REST",
+            "typeLabel": "休息",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 0
+          },
+          "20": {
+            "date": "2026-09-20",
+            "type": "LEAVE",
+            "typeLabel": "加班日",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 1
+          },
+          "21": {
+            "date": "2026-09-21",
+            "type": "LEAVE",
+            "typeLabel": "加班日",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 1
+          },
+          "22": {
+            "date": "2026-09-22",
+            "type": "LEAVE",
+            "typeLabel": "加班日",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 1
+          },
+          "23": {
+            "date": "2026-09-23",
+            "type": "HOLIDAY",
+            "typeLabel": "例假",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 0
+          },
+          "24": {
+            "date": "2026-09-24",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 0
+          },
+          "25": {
+            "date": "2026-09-25",
+            "type": "LEAVE",
+            "typeLabel": "加班日",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 1
+          },
+          "26": {
+            "date": "2026-09-26",
+            "type": "LEAVE",
+            "typeLabel": "加班日",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 1
+          },
+          "27": {
+            "date": "2026-09-27",
+            "type": "REST",
+            "typeLabel": "休息",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 0
+          },
+          "28": {
+            "date": "2026-09-28",
+            "type": "LEAVE",
+            "typeLabel": "加班日",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 1
+          },
+          "29": {
+            "date": "2026-09-29",
+            "type": "HOLIDAY",
+            "typeLabel": "例假",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 0
+          },
+          "30": {
+            "date": "2026-09-30",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 0
+          },
+          "01": {
+            "date": "2026-09-01",
+            "type": "HOLIDAY",
+            "typeLabel": "例假",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 0
+          },
+          "02": {
+            "date": "2026-09-02",
+            "type": "LEAVE",
+            "typeLabel": "加班日",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 1
+          },
+          "03": {
+            "date": "2026-09-03",
+            "type": "LEAVE",
+            "typeLabel": "加班日",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 1
+          },
+          "04": {
+            "date": "2026-09-04",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 0
+          },
+          "05": {
+            "date": "2026-09-05",
+            "type": "REST",
+            "typeLabel": "休息",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 0
+          },
+          "06": {
+            "date": "2026-09-06",
+            "type": "LEAVE",
+            "typeLabel": "加班日",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 1
+          },
+          "07": {
+            "date": "2026-09-07",
+            "type": "LEAVE",
+            "typeLabel": "加班日",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 1
+          },
+          "08": {
+            "date": "2026-09-08",
+            "type": "HOLIDAY",
+            "typeLabel": "例假",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 0
+          },
+          "09": {
+            "date": "2026-09-09",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 0
+          }
+        }
+      },
+      {
+        "id": "K25090",
+        "name": "陳萱菲",
+        "shift": "4A",
+        "group": "A3",
+        "title": "保養組",
+        "seniority": 1,
+        "note": "保養組",
+        "isMaintenance": true,
+        "days": {
+          "10": {
+            "date": "2026-09-10",
+            "type": "HOLIDAY",
+            "typeLabel": "例假",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 0
+          },
+          "11": {
+            "date": "2026-09-11",
+            "type": "LEAVE",
+            "typeLabel": "加班日",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 1
+          },
+          "12": {
+            "date": "2026-09-12",
+            "type": "LEAVE",
+            "typeLabel": "加班日",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 1
+          },
+          "13": {
+            "date": "2026-09-13",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 0
+          },
+          "14": {
+            "date": "2026-09-14",
+            "type": "LEAVE",
+            "typeLabel": "加班日",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 1
+          },
+          "15": {
+            "date": "2026-09-15",
+            "type": "LEAVE",
+            "typeLabel": "加班日",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 1
+          },
+          "16": {
+            "date": "2026-09-16",
+            "type": "REST",
+            "typeLabel": "休息",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 0
+          },
+          "17": {
+            "date": "2026-09-17",
+            "type": "HOLIDAY",
+            "typeLabel": "例假",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 0
+          },
+          "18": {
+            "date": "2026-09-18",
+            "type": "LEAVE",
+            "typeLabel": "加班日",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 1
+          },
+          "19": {
+            "date": "2026-09-19",
+            "type": "LEAVE",
+            "typeLabel": "加班日",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 1
+          },
+          "20": {
+            "date": "2026-09-20",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 0
+          },
+          "21": {
+            "date": "2026-09-21",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 0
+          },
+          "22": {
+            "date": "2026-09-22",
+            "type": "LEAVE",
+            "typeLabel": "加班日",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 1
+          },
+          "23": {
+            "date": "2026-09-23",
+            "type": "LEAVE",
+            "typeLabel": "加班日",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 1
+          },
+          "24": {
+            "date": "2026-09-24",
+            "type": "HOLIDAY",
+            "typeLabel": "例假",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 0
+          },
+          "25": {
+            "date": "2026-09-25",
+            "type": "LEAVE",
+            "typeLabel": "加班日",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 1
+          },
+          "26": {
+            "date": "2026-09-26",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 0
+          },
+          "27": {
+            "date": "2026-09-27",
+            "type": "LEAVE",
+            "typeLabel": "加班日",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 1
+          },
+          "28": {
+            "date": "2026-09-28",
+            "type": "LEAVE",
+            "typeLabel": "加班日",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 1
+          },
+          "29": {
+            "date": "2026-09-29",
+            "type": "HOLIDAY",
+            "typeLabel": "例假",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 0
+          },
+          "30": {
+            "date": "2026-09-30",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 0
+          },
+          "01": {
+            "date": "2026-09-01",
+            "type": "REST",
+            "typeLabel": "休息",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 0
+          },
+          "02": {
+            "date": "2026-09-02",
+            "type": "LEAVE",
+            "typeLabel": "加班日",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 1
+          },
+          "03": {
+            "date": "2026-09-03",
+            "type": "LEAVE",
+            "typeLabel": "加班日",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 1
+          },
+          "04": {
+            "date": "2026-09-04",
+            "type": "HOLIDAY",
+            "typeLabel": "例假",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 0
+          },
+          "05": {
+            "date": "2026-09-05",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 0
+          },
+          "06": {
+            "date": "2026-09-06",
+            "type": "LEAVE",
+            "typeLabel": "加班日",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 1
+          },
+          "07": {
+            "date": "2026-09-07",
+            "type": "LEAVE",
+            "typeLabel": "加班日",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 1
+          },
+          "08": {
+            "date": "2026-09-08",
+            "type": "LEAVE",
+            "typeLabel": "加班日",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 1
+          },
+          "09": {
+            "date": "2026-09-09",
+            "type": "REST",
+            "typeLabel": "休息",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 0
+          }
+        }
+      }
+    ],
+    "4B": [
+      {
+        "id": "K25131",
+        "name": "張宸旋",
+        "shift": "4B",
+        "group": "C1",
+        "title": "保養組",
+        "seniority": 1,
+        "note": "保養組",
+        "isMaintenance": true,
+        "days": {
+          "10": {
+            "date": "2026-09-10",
+            "type": "REST",
+            "typeLabel": "休息",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 0
+          },
+          "11": {
+            "date": "2026-09-11",
+            "type": "HOLIDAY",
+            "typeLabel": "例假",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 0
+          },
+          "12": {
+            "date": "2026-09-12",
+            "type": "LEAVE",
+            "typeLabel": "加班日",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 1
+          },
+          "13": {
+            "date": "2026-09-13",
+            "type": "LEAVE",
+            "typeLabel": "加班日",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 1
+          },
+          "14": {
+            "date": "2026-09-14",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 0
+          },
+          "15": {
+            "date": "2026-09-15",
+            "type": "REST",
+            "typeLabel": "休息",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 0
+          },
+          "16": {
+            "date": "2026-09-16",
+            "type": "LEAVE",
+            "typeLabel": "加班日",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 1
+          },
+          "17": {
+            "date": "2026-09-17",
+            "type": "LEAVE",
+            "typeLabel": "加班日",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 1
+          },
+          "18": {
+            "date": "2026-09-18",
+            "type": "HOLIDAY",
+            "typeLabel": "例假",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 0
+          },
+          "19": {
+            "date": "2026-09-19",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 0
+          },
+          "20": {
+            "date": "2026-09-20",
+            "type": "LEAVE",
+            "typeLabel": "加班日",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 1
+          },
+          "21": {
+            "date": "2026-09-21",
+            "type": "LEAVE",
+            "typeLabel": "加班日",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 1
+          },
+          "22": {
+            "date": "2026-09-22",
+            "type": "REST",
+            "typeLabel": "休息",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 0
+          },
+          "23": {
+            "date": "2026-09-23",
+            "type": "HOLIDAY",
+            "typeLabel": "例假",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 0
+          },
+          "24": {
+            "date": "2026-09-24",
+            "type": "LEAVE",
+            "typeLabel": "加班日",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 1
+          },
+          "25": {
+            "date": "2026-09-25",
+            "type": "LEAVE",
+            "typeLabel": "加班日",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 1
+          },
+          "26": {
+            "date": "2026-09-26",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 0
+          },
+          "27": {
+            "date": "2026-09-27",
+            "type": "REST",
+            "typeLabel": "休息",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 0
+          },
+          "28": {
+            "date": "2026-09-28",
+            "type": "LEAVE",
+            "typeLabel": "加班日",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 1
+          },
+          "29": {
+            "date": "2026-09-29",
+            "type": "LEAVE",
+            "typeLabel": "加班日",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 1
+          },
+          "30": {
+            "date": "2026-09-30",
+            "type": "HOLIDAY",
+            "typeLabel": "例假",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 0
+          },
+          "01": {
+            "date": "2026-09-01",
+            "type": "LEAVE",
+            "typeLabel": "加班日",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 1
+          },
+          "02": {
+            "date": "2026-09-02",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 0
+          },
+          "03": {
+            "date": "2026-09-03",
+            "type": "REST",
+            "typeLabel": "休息",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 0
+          },
+          "04": {
+            "date": "2026-09-04",
+            "type": "LEAVE",
+            "typeLabel": "加班日",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 1
+          },
+          "05": {
+            "date": "2026-09-05",
+            "type": "LEAVE",
+            "typeLabel": "加班日",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 1
+          },
+          "06": {
+            "date": "2026-09-06",
+            "type": "HOLIDAY",
+            "typeLabel": "例假",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 0
+          },
+          "07": {
+            "date": "2026-09-07",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 0
+          },
+          "08": {
+            "date": "2026-09-08",
+            "type": "LEAVE",
+            "typeLabel": "加班日",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 1
+          },
+          "09": {
+            "date": "2026-09-09",
+            "type": "LEAVE",
+            "typeLabel": "加班日",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 1
+          }
+        }
+      },
+      {
+        "id": "K25089",
+        "name": "鄭志庸",
+        "shift": "4B",
+        "group": "C2",
+        "title": "保養組",
+        "seniority": 1,
+        "note": "保養組",
+        "isMaintenance": true,
+        "days": {
+          "10": {
+            "date": "2026-09-10",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 0
+          },
+          "11": {
+            "date": "2026-09-11",
+            "type": "REST",
+            "typeLabel": "休息",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 0
+          },
+          "12": {
+            "date": "2026-09-12",
+            "type": "LEAVE",
+            "typeLabel": "加班日",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 1
+          },
+          "13": {
+            "date": "2026-09-13",
+            "type": "LEAVE",
+            "typeLabel": "加班日",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 1
+          },
+          "14": {
+            "date": "2026-09-14",
+            "type": "HOLIDAY",
+            "typeLabel": "例假",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 0
+          },
+          "15": {
+            "date": "2026-09-15",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 0
+          },
+          "16": {
+            "date": "2026-09-16",
+            "type": "LEAVE",
+            "typeLabel": "加班日",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 1
+          },
+          "17": {
+            "date": "2026-09-17",
+            "type": "LEAVE",
+            "typeLabel": "加班日",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 1
+          },
+          "18": {
+            "date": "2026-09-18",
+            "type": "REST",
+            "typeLabel": "休息",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 0
+          },
+          "19": {
+            "date": "2026-09-19",
+            "type": "HOLIDAY",
+            "typeLabel": "例假",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 0
+          },
+          "20": {
+            "date": "2026-09-20",
+            "type": "LEAVE",
+            "typeLabel": "加班日",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 1
+          },
+          "21": {
+            "date": "2026-09-21",
+            "type": "LEAVE",
+            "typeLabel": "加班日",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 1
+          },
+          "22": {
+            "date": "2026-09-22",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 0
+          },
+          "23": {
+            "date": "2026-09-23",
+            "type": "REST",
+            "typeLabel": "休息",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 0
+          },
+          "24": {
+            "date": "2026-09-24",
+            "type": "LEAVE",
+            "typeLabel": "加班日",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 1
+          },
+          "25": {
+            "date": "2026-09-25",
+            "type": "LEAVE",
+            "typeLabel": "加班日",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 1
+          },
+          "26": {
+            "date": "2026-09-26",
+            "type": "HOLIDAY",
+            "typeLabel": "例假",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 0
+          },
+          "27": {
+            "date": "2026-09-27",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 0
+          },
+          "28": {
+            "date": "2026-09-28",
+            "type": "LEAVE",
+            "typeLabel": "加班日",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 1
+          },
+          "29": {
+            "date": "2026-09-29",
+            "type": "LEAVE",
+            "typeLabel": "加班日",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 1
+          },
+          "30": {
+            "date": "2026-09-30",
+            "type": "REST",
+            "typeLabel": "休息",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 0
+          },
+          "01": {
+            "date": "2026-09-01",
+            "type": "LEAVE",
+            "typeLabel": "加班日",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 1
+          },
+          "02": {
+            "date": "2026-09-02",
+            "type": "HOLIDAY",
+            "typeLabel": "例假",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 0
+          },
+          "03": {
+            "date": "2026-09-03",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 0
+          },
+          "04": {
+            "date": "2026-09-04",
+            "type": "LEAVE",
+            "typeLabel": "加班日",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 1
+          },
+          "05": {
+            "date": "2026-09-05",
+            "type": "LEAVE",
+            "typeLabel": "加班日",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 1
+          },
+          "06": {
+            "date": "2026-09-06",
+            "type": "REST",
+            "typeLabel": "休息",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 0
+          },
+          "07": {
+            "date": "2026-09-07",
+            "type": "HOLIDAY",
+            "typeLabel": "例假",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 0
+          },
+          "08": {
+            "date": "2026-09-08",
+            "type": "LEAVE",
+            "typeLabel": "加班日",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 1
+          },
+          "09": {
+            "date": "2026-09-09",
+            "type": "LEAVE",
+            "typeLabel": "加班日",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 1
+          }
+        }
+      },
+      {
+        "id": "K25092",
+        "name": "鍾宛苓",
+        "shift": "4B",
+        "group": "C3",
+        "title": "保養組",
+        "seniority": 1,
+        "note": "保養組",
+        "isMaintenance": true,
+        "days": {
+          "10": {
+            "date": "2026-09-10",
+            "type": "LEAVE",
+            "typeLabel": "加班日",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 1
+          },
+          "11": {
+            "date": "2026-09-11",
+            "type": "REST",
+            "typeLabel": "休息",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 0
+          },
+          "12": {
+            "date": "2026-09-12",
+            "type": "HOLIDAY",
+            "typeLabel": "例假",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 0
+          },
+          "13": {
+            "date": "2026-09-13",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 0
+          },
+          "14": {
+            "date": "2026-09-14",
+            "type": "LEAVE",
+            "typeLabel": "加班日",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 1
+          },
+          "15": {
+            "date": "2026-09-15",
+            "type": "LEAVE",
+            "typeLabel": "加班日",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 1
+          },
+          "16": {
+            "date": "2026-09-16",
+            "type": "LEAVE",
+            "typeLabel": "加班日",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 1
+          },
+          "17": {
+            "date": "2026-09-17",
+            "type": "REST",
+            "typeLabel": "休息",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 0
+          },
+          "18": {
+            "date": "2026-09-18",
+            "type": "HOLIDAY",
+            "typeLabel": "例假",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 0
+          },
+          "19": {
+            "date": "2026-09-19",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 0
+          },
+          "20": {
+            "date": "2026-09-20",
+            "type": "LEAVE",
+            "typeLabel": "加班日",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 1
+          },
+          "21": {
+            "date": "2026-09-21",
+            "type": "LEAVE",
+            "typeLabel": "加班日",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 1
+          },
+          "22": {
+            "date": "2026-09-22",
+            "type": "LEAVE",
+            "typeLabel": "加班日",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 1
+          },
+          "23": {
+            "date": "2026-09-23",
+            "type": "REST",
+            "typeLabel": "休息",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 0
+          },
+          "24": {
+            "date": "2026-09-24",
+            "type": "HOLIDAY",
+            "typeLabel": "例假",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 0
+          },
+          "25": {
+            "date": "2026-09-25",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 0
+          },
+          "26": {
+            "date": "2026-09-26",
+            "type": "LEAVE",
+            "typeLabel": "加班日",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 1
+          },
+          "27": {
+            "date": "2026-09-27",
+            "type": "LEAVE",
+            "typeLabel": "加班日",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 1
+          },
+          "28": {
+            "date": "2026-09-28",
+            "type": "LEAVE",
+            "typeLabel": "加班日",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 1
+          },
+          "29": {
+            "date": "2026-09-29",
+            "type": "REST",
+            "typeLabel": "休息",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 0
+          },
+          "30": {
+            "date": "2026-09-30",
+            "type": "HOLIDAY",
+            "typeLabel": "例假",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 0
+          },
+          "01": {
+            "date": "2026-09-01",
+            "type": "LEAVE",
+            "typeLabel": "加班日",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 1
+          },
+          "02": {
+            "date": "2026-09-02",
+            "type": "LEAVE",
+            "typeLabel": "加班日",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 1
+          },
+          "03": {
+            "date": "2026-09-03",
+            "type": "REST",
+            "typeLabel": "休息",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 0
+          },
+          "04": {
+            "date": "2026-09-04",
+            "type": "HOLIDAY",
+            "typeLabel": "例假",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 0
+          },
+          "05": {
+            "date": "2026-09-05",
+            "type": "LEAVE",
+            "typeLabel": "加班日",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 1
+          },
+          "06": {
+            "date": "2026-09-06",
+            "type": "LEAVE",
+            "typeLabel": "加班日",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 1
+          },
+          "07": {
+            "date": "2026-09-07",
+            "type": "LEAVE",
+            "typeLabel": "加班日",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 1
+          },
+          "08": {
+            "date": "2026-09-08",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 0
+          },
+          "09": {
+            "date": "2026-09-09",
+            "type": "LEAVE",
+            "typeLabel": "加班日",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 1
+          }
+        }
+      },
+      {
+        "id": "K25132",
+        "name": "王靖嘉",
+        "shift": "4B",
+        "group": "C3",
+        "title": "保養組",
+        "seniority": 1,
+        "note": "保養組",
+        "isMaintenance": true,
+        "days": {
+          "10": {
+            "date": "2026-09-10",
+            "type": "LEAVE",
+            "typeLabel": "加班日",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 1
+          },
+          "11": {
+            "date": "2026-09-11",
+            "type": "HOLIDAY",
+            "typeLabel": "例假",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 0
+          },
+          "12": {
+            "date": "2026-09-12",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 0
+          },
+          "13": {
+            "date": "2026-09-13",
+            "type": "LEAVE",
+            "typeLabel": "加班日",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 1
+          },
+          "14": {
+            "date": "2026-09-14",
+            "type": "LEAVE",
+            "typeLabel": "加班日",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 1
+          },
+          "15": {
+            "date": "2026-09-15",
+            "type": "LEAVE",
+            "typeLabel": "加班日",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 1
+          },
+          "16": {
+            "date": "2026-09-16",
+            "type": "REST",
+            "typeLabel": "休息",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 0
+          },
+          "17": {
+            "date": "2026-09-17",
+            "type": "HOLIDAY",
+            "typeLabel": "例假",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 0
+          },
+          "18": {
+            "date": "2026-09-18",
+            "type": "LEAVE",
+            "typeLabel": "加班日",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 1
+          },
+          "19": {
+            "date": "2026-09-19",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 0
+          },
+          "20": {
+            "date": "2026-09-20",
+            "type": "LEAVE",
+            "typeLabel": "加班日",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 1
+          },
+          "21": {
+            "date": "2026-09-21",
+            "type": "LEAVE",
+            "typeLabel": "加班日",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 1
+          },
+          "22": {
+            "date": "2026-09-22",
+            "type": "LEAVE",
+            "typeLabel": "加班日",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 1
+          },
+          "23": {
+            "date": "2026-09-23",
+            "type": "REST",
+            "typeLabel": "休息",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 0
+          },
+          "24": {
+            "date": "2026-09-24",
+            "type": "HOLIDAY",
+            "typeLabel": "例假",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 0
+          },
+          "25": {
+            "date": "2026-09-25",
+            "type": "LEAVE",
+            "typeLabel": "加班日",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 1
+          },
+          "26": {
+            "date": "2026-09-26",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 0
+          },
+          "27": {
+            "date": "2026-09-27",
+            "type": "LEAVE",
+            "typeLabel": "加班日",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 1
+          },
+          "28": {
+            "date": "2026-09-28",
+            "type": "LEAVE",
+            "typeLabel": "加班日",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 1
+          },
+          "29": {
+            "date": "2026-09-29",
+            "type": "REST",
+            "typeLabel": "休息",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 0
+          },
+          "30": {
+            "date": "2026-09-30",
+            "type": "HOLIDAY",
+            "typeLabel": "例假",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 0
+          },
+          "01": {
+            "date": "2026-09-01",
+            "type": "LEAVE",
+            "typeLabel": "加班日",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 1
+          },
+          "02": {
+            "date": "2026-09-02",
+            "type": "LEAVE",
+            "typeLabel": "加班日",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 1
+          },
+          "03": {
+            "date": "2026-09-03",
+            "type": "REST",
+            "typeLabel": "休息",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 0
+          },
+          "04": {
+            "date": "2026-09-04",
+            "type": "HOLIDAY",
+            "typeLabel": "例假",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 0
+          },
+          "05": {
+            "date": "2026-09-05",
+            "type": "LEAVE",
+            "typeLabel": "加班日",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 1
+          },
+          "06": {
+            "date": "2026-09-06",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 0
+          },
+          "07": {
+            "date": "2026-09-07",
+            "type": "LEAVE",
+            "typeLabel": "加班日",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 1
+          },
+          "08": {
+            "date": "2026-09-08",
+            "type": "LEAVE",
+            "typeLabel": "加班日",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 1
+          },
+          "09": {
+            "date": "2026-09-09",
+            "type": "LEAVE",
+            "typeLabel": "加班日",
+            "loc": "KE",
+            "leave": 0,
+            "ot": 1
+          }
+        }
+      }
+    ],
+    "5A": [],
+    "5B": []
+  }
+}

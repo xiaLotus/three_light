@@ -1,0 +1,5 @@
+Flask>=3.0
+Flask-Cors>=4.0
+# 正式部署建議（擇一）：
+# waitress>=3.0        # Windows 友善的 WSGI server
+# gunicorn>=21.0       # Linux 常用

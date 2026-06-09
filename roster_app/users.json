@@ -1,0 +1,22 @@
+{
+  "users": [
+    {
+      "account": "ADM-001",
+      "name": "系統管理員",
+      "role": "LEADER",
+      "password": "admin123"
+    },
+    {
+      "account": "F1234",
+      "name": "王小明",
+      "role": "ENG",
+      "password": "eng123"
+    },
+    {
+      "account": "F5678",
+      "name": "李組長",
+      "role": "LEADER",
+      "password": "leader123"
+    }
+  ]
+}
