@@ -95,8 +95,10 @@
 
         // 只有後端回傳 success:true 才放行進入 index.html
         if(r.ok && d && d.success){
-          const role = (d.role === 'LEADER') ? 'LEADER' : 'ENG';
-          const intended = (role === 'LEADER' && !engOnly) ? 'LEADER' : 'ENG';
+          const role = (d.role === 'ADMIN') ? 'ADMIN'
+                     : (d.role === 'LEADER') ? 'LEADER' : 'ENG';
+          // 勾「以唯讀(ENG)登入」→ 一律 ENG；否則用真實角色（ADMIN/LEADER/ENG）
+          const intended = engOnly ? 'ENG' : role;
           sessionStorage.setItem('dsm_login', JSON.stringify({
             account: d.account || account,
             name:    d.name || account,
@@ -119,8 +121,8 @@
     $('password').addEventListener('keypress', e => { if(e.key === 'Enter') doLogin(); });
     $('account').addEventListener('keypress', e => { if(e.key === 'Enter') $('password').focus(); });
 
-    // 已登入則直接進主頁
-    try{ if(sessionStorage.getItem('dsm_login')) location.replace('index.html'); }catch(e){}
+    // 進入登入頁時清除舊的登入工作階段 → 可無條件重新登入（換人/重登）
+    try{ sessionStorage.removeItem('dsm_login'); }catch(e){}
   </script>
 </body>
 </html>

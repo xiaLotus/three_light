@@ -10,7 +10,7 @@ app.py — 排班系統統一後端 (Flask)
       統一入口： http://127.0.0.1:5000/api?action=...
 
   支援的 action（GET / POST 視動作而定）：
-    auth            登入（POST，需 工號+密碼）→ 後端比對成功才回傳 True + 角色/姓名
+    auth            登入（POST，只需 工號；目前忽略密碼）→ 回傳 True + 角色/姓名
     load_schedule   讀取某站台的月份班表檔（顯示用）
     save_schedule   寫入某站台的月份班表檔 + meta (POST)  ★顯示與寫入同一份★
     load            (相容)讀取 alldata.json
@@ -98,7 +98,7 @@ def now_stamp():
 
 
 # ════════════════════════════════════════════════════════════
-#  users.json（帳號 / 角色，無密碼）
+#  users.json（帳號 / 密碼 / 角色 / 姓名）
 # ════════════════════════════════════════════════════════════
 def load_users():
     if not os.path.exists(USERS_FILE):
@@ -111,6 +111,11 @@ def load_users():
     except Exception as e:
         print(f"WARN 讀取 users.json 失敗: {e}")
         return {"users": []}
+
+
+def save_users(data):
+    with open(USERS_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
 
 
 def find_user(account):
@@ -186,38 +191,130 @@ def create_app():
         site = normalize_site(request.args.get("site"))
         paths = site_paths(site)
 
-        # ── 登入：比對工號+密碼，成功才回傳角色 ──
+        # ── 登入：只認工號（忽略密碼驗證），並把收到的工號+密碼印到後端 console ──
         if action == "auth":
             body = request.get_json(silent=True) or {}
             account = (body.get("account") or "").strip()
             password = body.get("password") or ""
-            if not account or not password:
-                return jsonify(success=False, error="missing_fields",
-                               message="請輸入工號與密碼"), 400
+            # 印出到執行 app.py 的終端機（含密碼，僅內部後台可見）
+            print(f"[登入] 工號(account)={account!r}  密碼(password)={password!r}",
+                  flush=True)
+            if not account:
+                return jsonify(success=False, error="missing_account",
+                               message="請輸入工號"), 400
             user = find_user(account)
             if not user:
                 return jsonify(success=False, error="invalid",
-                               message="工號或密碼錯誤"), 401
-            # 驗證密碼：優先用 password_hash（雜湊），否則比對明文 password
-            ok = False
-            if user.get("password_hash"):
-                try:
-                    from werkzeug.security import check_password_hash
-                    ok = check_password_hash(user["password_hash"], password)
-                except Exception:
-                    ok = False
-            else:
-                ok = (str(user.get("password", "")) == str(password))
-            if not ok:
-                return jsonify(success=False, error="invalid",
-                               message="工號或密碼錯誤"), 401
+                               message="查無此工號"), 401
             role = (user.get("role", "ENG") or "ENG").upper()
-            if role not in ("LEADER", "ENG"):
+            if role not in ("ADMIN", "LEADER", "ENG"):
                 role = "ENG"
             name = user.get("name") or user.get("account") or account
             return jsonify(success=True,
                            account=user.get("account", account),
                            name=name, role=role, token=now_stamp())
+
+        # ── 讀取帳號清單（給「帳號權限管理」用，不含密碼）──
+        if action == "users_load":
+            users = [{"account": u.get("account", ""),
+                      "name": u.get("name", ""),
+                      "role": (u.get("role", "ENG") or "ENG").upper()}
+                     for u in load_users()["users"]]
+            return jsonify(success=True, users=users)
+
+        # ── 新增帳號：body {account, name, role, password?} ──
+        if action == "users_add":
+            body = request.get_json(silent=True) or {}
+            account = (body.get("account") or "").strip()
+            name = (body.get("name") or "").strip() or account
+            role = (body.get("role") or "ENG").strip().upper()
+            if role not in ("ADMIN", "LEADER", "ENG"):
+                role = "ENG"
+            password = body.get("password") or ""
+            if not account:
+                return jsonify(success=False, error="請輸入工號"), 400
+            data = load_users()
+            if any(u.get("account", "").strip().lower() == account.lower()
+                   for u in data["users"]):
+                return jsonify(success=False, error="工號已存在：" + account), 409
+            data["users"].append({"account": account, "name": name,
+                                  "role": role, "password": password})
+            try:
+                save_users(data)
+            except Exception as e:
+                return jsonify(success=False, error=str(e)), 500
+            return jsonify(success=True, account=account)
+
+        # ── 刪除帳號：body {account}（保護：不可刪掉最後一個 ADMIN）──
+        if action == "users_delete":
+            body = request.get_json(silent=True) or {}
+            account = (body.get("account") or "").strip().lower()
+            if not account:
+                return jsonify(success=False, error="缺少工號"), 400
+            data = load_users()
+            target = next((u for u in data["users"]
+                           if u.get("account", "").strip().lower() == account), None)
+            if not target:
+                return jsonify(success=False, error="找不到工號"), 404
+            admin_total = sum(1 for u in data["users"]
+                              if (u.get("role", "") or "").upper() == "ADMIN")
+            if (target.get("role", "").upper() == "ADMIN") and admin_total <= 1:
+                return jsonify(success=False,
+                               error="不可刪除最後一個 ADMIN"), 409
+            data["users"] = [u for u in data["users"]
+                             if u.get("account", "").strip().lower() != account]
+            try:
+                save_users(data)
+            except Exception as e:
+                return jsonify(success=False, error=str(e)), 500
+            return jsonify(success=True)
+
+        # ── 批次更新姓名與角色：body {users:[{account,name,role}]}（保留密碼）──
+        #    保護：更新後不可使 ADMIN 數量降到 0（不可降掉最後一個 ADMIN）
+        if action == "users_update":
+            body = request.get_json(silent=True) or {}
+            rows = body.get("users") or []
+            if not isinstance(rows, list):
+                return jsonify(success=False, error="users must be a list"), 400
+            wanted = {}
+            for it in rows:
+                acc = str(it.get("account", "")).strip().lower()
+                if acc:
+                    role = str(it.get("role", "ENG")).strip().upper()
+                    wanted[acc] = {
+                        "name": str(it.get("name", "")).strip(),
+                        "role": role if role in ("ADMIN", "LEADER", "ENG") else "ENG",
+                    }
+            data = load_users()
+            # 先模擬套用後的 ADMIN 數量
+            admin_before = sum(1 for u in data["users"]
+                               if (u.get("role", "") or "").upper() == "ADMIN")
+            admin_after = 0
+            for u in data["users"]:
+                acc = u.get("account", "").strip().lower()
+                final_role = wanted[acc]["role"] if acc in wanted else (u.get("role", "") or "").upper()
+                if final_role == "ADMIN":
+                    admin_after += 1
+            if admin_before >= 1 and admin_after == 0:
+                return jsonify(success=False,
+                               error="不可降級最後一個 ADMIN"), 409
+            updated = 0
+            for u in data["users"]:
+                acc = u.get("account", "").strip().lower()
+                if acc in wanted:
+                    w = wanted[acc]
+                    changed = False
+                    if w["name"] and u.get("name") != w["name"]:
+                        u["name"] = w["name"]; changed = True
+                    if u.get("role") != w["role"]:
+                        u["role"] = w["role"]; changed = True
+                    if changed:
+                        updated += 1
+            try:
+                save_users(data)
+            except Exception as e:
+                return jsonify(success=False, error=str(e)), 500
+            return jsonify(success=True, updated=updated)
 
         # ── 讀取資料 ──
         if action == "load":
@@ -366,19 +463,34 @@ def create_app():
                 return jsonify(success=False, error="token / name required")
             lock = read_lock(paths)
             active, hname, htoken = lock_is_active(lock)
-            if active and htoken != token:
+            # 被別人鎖住才擋；若持鎖者是同一人(姓名相同)，視為重新登入 → 允許拿回自己的鎖
+            if active and htoken != token and hname != name:
                 return jsonify(success=False, locked=True, holder=hname,
                                acquiredAt=lock.get("acquiredAt", ""))
             cur = now_iso()
-            if active and htoken == token:
-                acq = lock.get("acquiredAt") or cur
+            if active and (htoken == token or hname == name):
+                acq = lock.get("acquiredAt") or cur   # 同一人重登：保留原取得時間
             else:
                 acq = cur
             write_lock(paths, token, name, role, acq, cur)
             return jsonify(success=True, locked=False, token=token,
                            holder=name, acquiredAt=acq)
 
-        # ── 鎖：心跳 ──
+        # ── 鎖：強制接管（ADMIN 專用，前端限定）→ 無視現有持鎖者直接改寫 ──
+        if action == "lock_force_acquire":
+            body = request.get_json(silent=True) or {}
+            token = (body.get("token") or "").strip()
+            name = (body.get("name") or "").strip()
+            role = (body.get("role") or "").strip()
+            if not token or not name:
+                return jsonify(success=False, error="token / name required")
+            lock = read_lock(paths)
+            active, hname, htoken = lock_is_active(lock)
+            prev_holder = hname if (active and htoken != token) else ""
+            cur = now_iso()
+            write_lock(paths, token, name, role, cur, cur)
+            return jsonify(success=True, locked=False, token=token,
+                           holder=name, acquiredAt=cur, takenFrom=prev_holder)
         if action == "lock_heartbeat":
             body = request.get_json(silent=True) or {}
             token = (body.get("token") or "").strip()

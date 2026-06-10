@@ -312,6 +312,13 @@ body{font-family:'Noto Sans TC',sans-serif;background:var(--main-bg);color:var(-
 [data-role="ENG"] .leader-only,[data-role="ENG"] .leader-only *{pointer-events:none;}
 [data-role="ENG"] .leader-only{opacity:.45;filter:saturate(.4);cursor:not-allowed!important;}
 [data-role="ENG"] .leader-only-hide{display:none!important;}
+
+/* 依「真實角色」(data-trole=ADMIN/LEADER/ENG) 控制，不受站台編輯鎖影響：
+   - editor-only-hide：僅 LEADER / ADMIN 看得到（帳號管理、系統設定選單）
+   - admin-only-hide ：僅 ADMIN 看得到（角色下拉等） */
+[data-trole="ENG"] .editor-only-hide,[data-trole="NONE"] .editor-only-hide{display:none!important;}
+[data-trole="ENG"] .admin-only-hide,[data-trole="LEADER"] .admin-only-hide,[data-trole="NONE"] .admin-only-hide{display:none!important;}
+.role-badge.role-ADMIN{background:rgba(167,139,250,.16);color:#a78bfa;border:1px solid rgba(167,139,250,.4);}
 /* ═══ 廠區分頁列 ═══ */
 #site-tabs{position:sticky;top:0;z-index:900;background:linear-gradient(180deg,#0f1628,#0c1220);border-bottom:1px solid #1e2d50;padding:0 22px;}
 .site-tabs-inner{display:flex;align-items:center;gap:8px;height:46px;flex-wrap:wrap;}

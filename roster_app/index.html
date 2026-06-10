@@ -35,8 +35,8 @@
     <button class="nav-item-btn" onclick="navigate('calendar',this)"><i class="bi bi-calendar3"></i><span>排班行事曆</span></button>
     <button id="nav-personnel" class="nav-item-btn leader-only-hide" onclick="navigate('personnel',this)"><i class="bi bi-people-fill"></i><span>人員管理</span></button>
     <button class="nav-item-btn" onclick="navigate('analysis',this)"><i class="bi bi-bar-chart-line-fill"></i><span>出勤分析</span></button>
-    <div id="nav-sys-label" class="nav-section-label leader-only-hide">系統</div>
-    <button id="nav-settings" class="nav-item-btn leader-only-hide" onclick="navigate('settings',this)"><i class="bi bi-gear-fill"></i><span>系統設定</span></button>
+    <div id="nav-sys-label" class="nav-section-label editor-only-hide">系統</div>
+    <button id="nav-settings" class="nav-item-btn editor-only-hide" onclick="navigate('settings',this)"><i class="bi bi-gear-fill"></i><span>系統設定</span></button>
   </div>
   <div class="sidebar-footer">
     <div class="user-card">
@@ -164,6 +164,10 @@
             <div style="font-size:14px;font-weight:700;color:var(--text-dark);margin-top:2px" id="dash-leader-status">尚未有人持有</div>
             <div style="font-size:11px;color:var(--text-muted);margin-top:2px" id="dash-leader-since">—</div>
           </div>
+          <button id="dash-takeover-btn" onclick="forceTakeoverLock()" title="以 ADMIN 身分強制接管此廠編輯權"
+            style="display:none;background:rgba(167,139,250,.14);color:#7b5ea7;border:1px solid rgba(167,139,250,.4);border-radius:8px;padding:8px 12px;font-size:12px;font-weight:700;cursor:pointer;flex-shrink:0;white-space:nowrap">
+            <i class="bi bi-hand-index-thumb me-1"></i>強制接管
+          </button>
         </div>
       </div>
 
@@ -564,45 +568,54 @@
         </div>
       </div>
 
-      <!-- ═══ 工號權限綁定（Leader 限定）═══ -->
-      <div class="settings-section leader-only" style="margin-top:16px">
-        <h5><i class="bi bi-shield-lock"></i>工號權限綁定（全廠共用）</h5>
+      <!-- ═══ 帳號權限管理：新增/刪除/改權限，直接寫 users.json（LEADER/ADMIN 可見）═══ -->
+      <div class="settings-section editor-only-hide" style="margin-top:16px">
+        <h5><i class="bi bi-shield-lock"></i>帳號權限管理（users.json）</h5>
         <p style="font-size:12px;color:var(--text-muted);margin:-4px 0 14px;line-height:1.7">
-          <b style="color:var(--danger)">預設規則：所有工號登入皆為 ENG（唯讀）</b>，只有在此清單中被指定為
-          <b style="color:#0098ff">Leader</b> 的工號，登入時才能取得編輯權限。<br>
-          此清單為 <b>三個廠區（A3 / KL / 南科）共用</b>。被指定 Leader 者登入時需輸入 Leader 密碼，
-          且仍受各廠「同時一位 Leader」的鎖限制。
+          <b style="color:#a78bfa">ADMIN</b> 可新增/刪除任一帳號、改任何人的姓名與角色（含設為 LEADER / ADMIN）。<br>
+          <b style="color:#0098ff">LEADER</b> 只能<b>新增 ENG</b>、<b>刪除 ENG</b>、<b>改 ENG 的姓名</b>，不能調整任何人的角色。<br>
+          變更即<b>立即寫回 users.json</b>，受影響的人<b>下次登入</b>生效。
         </p>
+
+        <!-- 新增帳號 -->
         <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin-bottom:14px">
-          <div style="flex:1;min-width:150px">
-            <label class="form-label">工號</label>
-            <input class="form-control" id="rb-input-id" placeholder="例：K25091" list="rb-id-suggestions" autocomplete="off">
-            <datalist id="rb-id-suggestions"></datalist>
-          </div>
           <div style="width:150px">
-            <label class="form-label">權限</label>
-            <select class="form-select" id="rb-input-role">
-              <option value="LEADER">Leader（可編輯）</option>
-              <option value="ENG">ENG（唯讀，預設）</option>
+            <label class="form-label">工號</label>
+            <input class="form-control" id="u-add-account" placeholder="例：K12345" autocomplete="off">
+          </div>
+          <div style="flex:1;min-width:120px">
+            <label class="form-label">姓名</label>
+            <input class="form-control" id="u-add-name" placeholder="例：王小明" autocomplete="off">
+          </div>
+          <div style="width:160px" class="admin-only-hide">
+            <label class="form-label">角色（ADMIN 限定）</label>
+            <select class="form-select" id="u-add-role">
+              <option value="ENG">ENG（唯讀）</option>
+              <option value="LEADER">LEADER（可編輯）</option>
+              <option value="ADMIN">ADMIN（最高權限）</option>
             </select>
           </div>
-          <button class="btn" style="background:var(--accent);color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;padding:9px 18px" onclick="addRoleBinding()">
-            <i class="bi bi-plus-lg me-1"></i>新增 / 更新綁定
+          <button class="btn" style="background:var(--accent);color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;padding:9px 18px" onclick="addUser()">
+            <i class="bi bi-person-plus me-1"></i>新增帳號
           </button>
         </div>
+
         <div style="overflow-x:auto">
           <table class="table" style="font-size:13px;width:100%">
             <thead>
               <tr>
                 <th style="text-align:left">工號</th>
                 <th style="text-align:left">姓名</th>
-                <th style="text-align:left">綁定權限</th>
+                <th style="text-align:left">角色</th>
                 <th style="text-align:right">操作</th>
               </tr>
             </thead>
             <tbody id="rb-tbody"></tbody>
           </table>
         </div>
+          <p style="font-size:11.5px;color:var(--text-muted);margin-top:10px">
+            <i class="bi bi-info-circle me-1"></i>角色或姓名一經變更即<b>立即寫入 users.json</b>，無需另外按儲存。
+          </p>
       </div>
 
       <div class="text-end mt-2 leader-only">

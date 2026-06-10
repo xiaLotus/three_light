@@ -101,18 +101,31 @@ let currentRole = null;           // 'LEADER' | 'ENG' | null（在目前站台�
 let myIntendedRole = 'ENG';       // 登入者本身的權限上限（LEADER 表示可在任一站台爭取編輯權）
 let selectedLoginRole = 'LEADER'; // 選中但尚未送出的角色
 let myName = '';                  // 登入者姓名
+let myAccount = '';               // 登入者工號（不能修改/刪除自己）
 let myLockToken = '';             // Leader 鎖 token（僅 LEADER 持有）
 let myAuthToken = '';             // Flask 認證 token（登入成功後由後端發給，可用於後續驗證）
 let _heartbeatTimer = null;
 let _lockPollTimer = null;
 let _lastModifiedInfo = { savedAt:null, savedBy:null };
 
-function isLeader(){ return currentRole === 'LEADER'; }
+// 目前站台「有效角色」可編輯者：LEADER 或 ADMIN（需持有該站編輯鎖）
+function isLeader(){ return currentRole === 'LEADER' || currentRole === 'ADMIN'; }
 function requireLeader(action){
   if(!isLeader()){
-    showToast('⚠️ 此功能僅限 Leader 角色執行（您目前為 ENG 唯讀模式）','warning');
+    showToast('⚠️ 此功能需編輯權限（LEADER / ADMIN），您目前為 ENG 唯讀模式','warning');
     return false;
   }
+  return true;
+}
+// 依「真實登入角色」(myIntendedRole) 判定，帳號管理用，不受站台鎖影響
+function trueIsAdmin(){ return myIntendedRole === 'ADMIN'; }
+function trueIsAccountEditor(){ return myIntendedRole === 'ADMIN' || myIntendedRole === 'LEADER'; }
+function requireAdmin(){
+  if(!trueIsAdmin()){ showToast('⚠️ 此功能僅限 ADMIN','warning'); return false; }
+  return true;
+}
+function requireAccountEditor(){
+  if(!trueIsAccountEditor()){ showToast('⚠️ 此功能僅限 LEADER / ADMIN','warning'); return false; }
   return true;
 }
 
@@ -327,6 +340,33 @@ async function tryAcquireLeaderLock(name){
   }
 }
 
+/* ADMIN 強制接管：無視現有持鎖者，直接取得本廠編輯權 */
+async function forceTakeoverLock(){
+  if(!requireAdmin()) return;   // 僅限真實角色 ADMIN
+  if(!confirm('確定要強制接管「'+siteName(currentSite)+'」的編輯權？\n目前正在編輯者會被轉為唯讀，其最後數秒未存檔的變動可能遺失。')) return;
+  const token = myLockToken || genToken();
+  try{
+    const r = await fetch(API_URL+'?action=lock_force_acquire'+siteQ(),{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ token, name: myName, role: myIntendedRole })
+    });
+    const d = await r.json();
+    if(d && d.success){
+      myLockToken = token;
+      currentRole = myIntendedRole;   // 取回編輯權（ADMIN）
+      try{ sessionStorage.setItem(LS_KEY_SESSION, JSON.stringify({role:currentRole, intended:myIntendedRole, name:myName, token:myLockToken, site:currentSite})); }catch(e){}
+      startHeartbeat();
+      applyRoleToUI();
+      try{ renderSchedule(); renderPersonnel(); buildDashboard(); }catch(e){}
+      refreshLockStatus();
+      showToast('已強制接管編輯權'+(d.takenFrom?('（原編輯者：'+d.takenFrom+'）'):'')+'，您現在可編輯','success');
+    }else{
+      showToast('接管失敗：'+((d&&d.error)||'未知錯誤'),'error');
+    }
+  }catch(e){ showToast('接管失敗：'+e.message,'error'); }
+}
+
 function startHeartbeat(){
   if(PREVIEW_MODE) return; // 預覽模式無心跳
   if(_heartbeatTimer) clearInterval(_heartbeatTimer);
@@ -371,12 +411,15 @@ async function refreshLockStatus(){
   const stat  = document.getElementById('dash-leader-status');
   const since = document.getElementById('dash-leader-since');
   const icon  = document.getElementById('dash-leader-icon');
-  if(!stat || !since) return;
+  const tk    = document.getElementById('dash-takeover-btn');
+  const hideTk = ()=>{ if(tk) tk.style.display='none'; };
+  if(!stat || !since){ hideTk(); return; }
   if(PREVIEW_MODE){
     stat.textContent = '預覽模式（單機）';
     stat.style.color = '#b37400';
     since.textContent = '此為離線預覽版，未啟動 Leader 鎖機制';
     if(icon){ icon.style.background='rgba(255,165,2,.12)'; icon.style.color='var(--warning)'; icon.firstElementChild.className='bi bi-laptop'; }
+    hideTk();
     return;
   }
   try{
@@ -387,16 +430,21 @@ async function refreshLockStatus(){
       stat.style.color = '#0095b3';
       since.textContent = '取得時間：'+(d.acquiredAt||'—');
       if(icon){ icon.style.background='rgba(0,212,255,.12)'; icon.style.color='var(--accent)'; icon.firstElementChild.className='bi bi-shield-fill-check'; }
+      // 被降權的 ADMIN（鎖在別人手上）→ 顯示「強制接管」
+      const heldByOther = (d.holder || '') !== myName;
+      if(tk) tk.style.display = (trueIsAdmin() && currentRole!=='ADMIN' && heldByOther) ? 'inline-flex' : 'none';
     }else{
       stat.textContent = '無人持有（可登入 Leader）';
       stat.style.color = '#6b7280';
       since.textContent = '若有人正以 Leader 編輯，會顯示於此';
       if(icon){ icon.style.background='rgba(107,114,128,.1)'; icon.style.color='#6b7280'; icon.firstElementChild.className='bi bi-unlock-fill'; }
+      hideTk();
     }
   }catch(e){
     // 後端無回應 → 顯示為單機模式
     if(stat){ stat.textContent='單機 / 離線模式'; stat.style.color='#b37400'; }
     if(since){ since.textContent='伺服器未連線，鎖機制不啟用'; }
+    hideTk();
   }
 }
 
@@ -423,11 +471,16 @@ async function doLogout(){
 
 function applyRoleToUI(){
   document.body.setAttribute('data-role', currentRole||'NONE');
+  document.body.setAttribute('data-trole', myIntendedRole||'NONE');   // 真實角色（帳號管理用）
   const badge=document.getElementById('sidebar-role-badge');
   const txt  =document.getElementById('sidebar-role-text');
   if(badge && txt){
-    badge.classList.remove('role-LEADER','role-ENG');
-    if(currentRole==='LEADER'){
+    badge.classList.remove('role-LEADER','role-ENG','role-ADMIN');
+    if(currentRole==='ADMIN'){
+      badge.classList.add('role-ADMIN');
+      badge.querySelector('i').className='bi bi-gem';
+      txt.textContent='ADMIN';
+    }else if(currentRole==='LEADER'){
       badge.classList.add('role-LEADER');
       badge.querySelector('i').className='bi bi-shield-fill-check';
       txt.textContent='LEADER';
@@ -441,9 +494,12 @@ function applyRoleToUI(){
   const sn=document.getElementById('sidebar-admin-name');
   const sr=document.getElementById('sidebar-admin-role');
   const sv=document.getElementById('sidebar-avatar');
-  if(sn) sn.textContent = myName || (currentRole==='LEADER'?'系統管理員':'值班工程師');
-  if(sr) sr.textContent = currentRole==='LEADER'?'Leader｜編輯權限':'ENG｜唯讀模式';
-  if(sv) sv.textContent = (myName && myName[0]) ? myName[0] : (currentRole==='LEADER'?'L':'E');
+  const roleLabel = currentRole==='ADMIN' ? 'Admin｜最高權限'
+                  : currentRole==='LEADER' ? 'Leader｜編輯權限'
+                  : 'ENG｜唯讀模式';
+  if(sn) sn.textContent = myName || (isLeader()?'系統管理員':'值班工程師');
+  if(sr) sr.textContent = roleLabel;
+  if(sv) sv.textContent = (myName && myName[0]) ? myName[0] : (currentRole==='ADMIN'?'A':currentRole==='LEADER'?'L':'E');
 }
 
 /* 嘗試還原 session（重新整理頁面後不必再登入） */
@@ -452,7 +508,7 @@ async function tryRestoreSession(){
     const raw = sessionStorage.getItem(LS_KEY_SESSION);
     if(!raw) return false;
     const sess = JSON.parse(raw);
-    if(!sess || (sess.role!=='LEADER' && sess.role!=='ENG')) return false;
+    if(!sess || !['ADMIN','LEADER','ENG'].includes(sess.role)) return false;
 
     currentRole = sess.role;
     myIntendedRole = sess.intended || sess.role || 'ENG';
@@ -460,8 +516,8 @@ async function tryRestoreSession(){
     myLockToken = sess.token || '';
     if(sess.site && SITES.some(s=>s.id===sess.site)) currentSite = sess.site;
 
-    // 若是 LEADER，要重新確認鎖還在自己手上
-    if(currentRole==='LEADER'){
+    // 若是編輯者(LEADER/ADMIN)，要重新確認鎖還在自己手上
+    if(currentRole==='LEADER' || currentRole==='ADMIN'){
       if(PREVIEW_MODE){
         // 預覽模式：永遠保留 LEADER 不需要核對鎖
       }else if(myLockToken){
@@ -502,24 +558,25 @@ async function tryRestoreSession(){
 async function initSession(){
   let sess = null;
   try{ sess = JSON.parse(sessionStorage.getItem('dsm_login') || 'null'); }catch(e){}
-  if(!sess || !sess.account || (sess.intended!=='LEADER' && sess.intended!=='ENG')){
+  if(!sess || !sess.account || !['ADMIN','LEADER','ENG'].includes(sess.intended)){
     location.replace('login.html');
     return false;
   }
   myName = sess.name || sess.account;
-  myIntendedRole = sess.intended;   // 權限上限（登入頁依後端角色 + 是否選唯讀決定）
+  myAccount = (sess.account || '').trim();   // 登入者工號（用於「不能改自己權限」）
+  myIntendedRole = sess.intended;   // 真實角色（ADMIN/LEADER/ENG）
 
-  if(myIntendedRole === 'LEADER'){
+  if(myIntendedRole === 'LEADER' || myIntendedRole === 'ADMIN'){
     if(PREVIEW_MODE){
-      currentRole = 'LEADER';
+      currentRole = myIntendedRole;
     }else{
       const lock = await tryAcquireLeaderLock(myName);
       if(lock.success){
-        currentRole = 'LEADER';
+        currentRole = myIntendedRole;   // 取得編輯鎖 → 維持真實角色
         startHeartbeat();
       }else{
-        currentRole = 'ENG';
-        showToast('['+siteName(currentSite)+'] 已有 Leader 在線：'+(lock.holder||'未知')+'，您在此廠為 ENG 唯讀','warning');
+        currentRole = 'ENG';            // 該站已有編輯者 → 此站降為唯讀（帳號管理仍依真實角色）
+        showToast('['+siteName(currentSite)+'] 已有編輯者在線：'+(lock.holder||'未知')+'，您在此廠為 ENG 唯讀','warning');
       }
     }
   }else{
@@ -960,15 +1017,15 @@ async function switchSite(siteId){
   await initLoadData();
   ensureVisibleMonthsBuilt();   // 補建該站尚無資料的可見月份（空白站台則略過）
 
-  // 5. 重新評估在新站台的角色（具 Leader 上限者才爭取編輯權）
-  if(myIntendedRole === 'LEADER'){
+  // 5. 重新評估在新站台的角色（具編輯權者 LEADER/ADMIN 才爭取編輯鎖）
+  if(myIntendedRole === 'LEADER' || myIntendedRole === 'ADMIN'){
     const lockResult = await tryAcquireLeaderLock(myName);
     if(lockResult.success){
-      currentRole = 'LEADER';
+      currentRole = myIntendedRole;
       startHeartbeat();
     }else{
       currentRole = 'ENG';
-      showToast('['+siteName(currentSite)+'] 已有 Leader 在線：'+(lockResult.holder||'未知')+'，您在此廠為 ENG 唯讀','warning');
+      showToast('['+siteName(currentSite)+'] 已有編輯者在線：'+(lockResult.holder||'未知')+'，您在此廠為 ENG 唯讀','warning');
     }
   }else{
     currentRole = 'ENG';
@@ -1009,14 +1066,12 @@ function updateSiteTabsUI(){
 }
 
 function applyAdminConfig(c){
-  if(c.adminName){
-    const sn=document.getElementById('sidebar-admin-name');
-    const sr=document.getElementById('sidebar-admin-role');
-    const sv=document.getElementById('sidebar-avatar');
-    if(sn)sn.textContent=c.adminName;
-    if(sr)sr.textContent='Admin｜'+(c.adminId||'ADM-001');
-    if(sv)sv.textContent=c.adminName[0]||'管';
-  }
+  if(!c) return;
+  // 管理員設定只回填到「系統設定」表單，不覆蓋側邊欄的「登入身分」
+  const ni=document.getElementById('setting-admin-name');
+  const ei=document.getElementById('setting-admin-id');
+  if(ni && c.adminName) ni.value=c.adminName;
+  if(ei && c.adminId)   ei.value=c.adminId;
 }
 
 // 保留向下相容
@@ -2738,76 +2793,168 @@ function calcSeniority(){
 /* ── SAVE SETTINGS ── */
 function saveSettings(){
   if(!requireLeader()) return;
-  const name=(document.getElementById('setting-admin-name').value||'').trim()||'系統管理員';
-  const empId=(document.getElementById('setting-admin-id').value||'').trim()||'ADM-001';
-  document.getElementById('sidebar-admin-name').textContent=name;
-  document.getElementById('sidebar-admin-role').textContent='Admin｜'+empId;
-  document.getElementById('sidebar-avatar').textContent=name[0]||'管';
+  // 管理員姓名/編號僅作為系統設定保存（serverSave 會讀取輸入框寫入 meta.config）；
+  // 側邊欄顯示的是「登入身分」，不在此處覆蓋。
   lsSave();
-  showToast('設定已儲存，管理者資訊已更新','success');
+  showToast('設定已儲存','success');
 }
 
 /* ════════════════════════════════════════════════════════
    🔐 工號權限綁定 (Role Binding)
    ════════════════════════════════════════════════════════ */
-function renderRoleBindings(){
+// 帳號權限管理：列出 users.json 帳號，可切換角色後儲存回檔
+let _usersCache = [];
+async function renderRoleBindings(){
   const tb = document.getElementById('rb-tbody');
   if(!tb) return;
-  // 工號建議清單（datalist）
-  const dl = document.getElementById('rb-id-suggestions');
-  if(dl){
-    try{
-      dl.innerHTML = engineers.map(e=>`<option value="${escapeHtml(e.id)}">${escapeHtml(e.name)}（${escapeHtml(e.shift)} ${escapeHtml(e.group)}）</option>`).join('');
-    }catch(e){}
-  }
-  const ids = Object.keys(roleBindings);
-  if(ids.length === 0){
-    tb.innerHTML = `<tr><td colspan="4" style="text-align:center;color:var(--text-muted);padding:18px">尚未設定任何工號綁定（未綁定的工號維持原本登入方式）</td></tr>`;
+  tb.innerHTML = `<tr><td colspan="4" style="text-align:center;color:var(--text-muted);padding:18px">載入中…</td></tr>`;
+  try{
+    const r = await fetch(API_URL+'?action=users_load',{cache:'no-store'});
+    const d = await r.json();
+    if(!d || !d.success) throw new Error('load failed');
+    _usersCache = d.users || [];
+  }catch(e){
+    tb.innerHTML = `<tr><td colspan="4" style="text-align:center;color:var(--danger);padding:18px">無法讀取 users.json（後端是否啟動？）</td></tr>`;
     return;
   }
-  tb.innerHTML = ids.map(id=>{
-    const role = roleBindings[id];
-    let name = '（查無此工號）';
-    try{ const eng = engineers.find(e=>e.id===id); if(eng) name = eng.name; }catch(e){}
-    const badge = role==='LEADER'
-      ? '<span class="role-badge role-LEADER"><i class="bi bi-shield-fill-check"></i> LEADER</span>'
-      : '<span class="role-badge role-ENG"><i class="bi bi-person-badge"></i> ENG</span>';
+  if(_usersCache.length === 0){
+    tb.innerHTML = `<tr><td colspan="4" style="text-align:center;color:var(--text-muted);padding:18px">users.json 沒有任何帳號</td></tr>`;
+    return;
+  }
+  const viewerAdmin = trueIsAdmin();
+  const adminCount = _usersCache.filter(u=>(u.role||'').toUpperCase()==='ADMIN').length;
+  tb.innerHTML = _usersCache.map(u=>{
+    const acc = escapeHtml(u.account);
+    const nm  = escapeHtml(u.name||'');
+    const uRole = (u.role||'ENG').toUpperCase();
+    const isSelf = (String(u.account).trim().toLowerCase() === String(myAccount).trim().toLowerCase());
+    const isENG  = (uRole === 'ENG');
+    // 可否對此列動作：ADMIN→任一列(非本人)；LEADER→僅 ENG 列(非本人)
+    const canActOnRow = !isSelf && (viewerAdmin || isENG);
+
+    const roleBadge = uRole==='ADMIN'
+      ? '<span class="role-badge role-ADMIN"><i class="bi bi-gem"></i> ADMIN</span>'
+      : uRole==='LEADER'
+        ? '<span class="role-badge role-LEADER"><i class="bi bi-shield-fill-check"></i> LEADER</span>'
+        : '<span class="role-badge role-ENG"><i class="bi bi-person-badge"></i> ENG</span>';
+    const selfTag = isSelf ? ' <span style="font-size:11px;color:var(--accent);font-weight:700">（本人）</span>' : '';
+
+    // 角色欄：只有 ADMIN 且非本人 → 可改角色下拉；其餘只顯示徽章
+    let roleCell;
+    if(viewerAdmin && !isSelf){
+      roleCell = `<select class="form-select form-select-sm rb-role" data-account="${acc}" onchange="saveOneUser('${acc}')" style="width:auto;display:inline-block;font-size:12px">
+           <option value="ENG"${uRole==='ENG'?' selected':''}>ENG（唯讀）</option>
+           <option value="LEADER"${uRole==='LEADER'?' selected':''}>LEADER（可編輯）</option>
+           <option value="ADMIN"${uRole==='ADMIN'?' selected':''}>ADMIN（最高權限）</option>
+         </select>`;
+    }else{
+      roleCell = roleBadge + selfTag;
+    }
+
+    // 姓名欄：可動作才可編輯
+    const nameCell = canActOnRow
+      ? `<input class="form-control form-control-sm rb-name" data-account="${acc}" value="${nm}" onchange="saveOneUser('${acc}')" style="font-size:12px;min-width:90px">`
+      : `<input class="form-control form-control-sm" value="${nm}" disabled style="font-size:12px;min-width:90px;opacity:.6">`;
+
+    // 操作欄：可動作才可刪；最後一個 ADMIN 不可刪
+    let opCell;
+    if(!canActOnRow){
+      opCell = `<span style="color:var(--text-muted);font-size:11px">—</span>`;
+    }else if(uRole==='ADMIN' && adminCount<=1){
+      opCell = `<span title="最後一個 ADMIN 不可刪除" style="color:var(--text-muted);font-size:13px"><i class="bi bi-lock-fill"></i></span>`;
+    }else{
+      opCell = `<button class="icon-btn" onclick="deleteUser('${acc}')" title="刪除帳號" style="color:var(--danger);background:none;border:none;cursor:pointer;font-size:15px"><i class="bi bi-trash3"></i></button>`;
+    }
+
     return `<tr>
-      <td style="font-family:'JetBrains Mono',monospace;font-weight:700;color:var(--accent)">${escapeHtml(id)}</td>
-      <td>${escapeHtml(name)}</td>
-      <td>${badge}</td>
-      <td style="text-align:right">
-        <button class="icon-btn" onclick="removeRoleBinding('${escapeHtml(id)}')" title="刪除綁定" style="color:var(--danger);background:none;border:none;cursor:pointer;font-size:15px"><i class="bi bi-trash3"></i></button>
-      </td>
+      <td style="font-family:'JetBrains Mono',monospace;font-weight:700;color:var(--accent)">${acc}</td>
+      <td>${nameCell}</td>
+      <td>${roleCell}</td>
+      <td style="text-align:right">${opCell}</td>
     </tr>`;
   }).join('');
 }
 
-function addRoleBinding(){
-  if(!requireLeader()) return;
-  const idEl = document.getElementById('rb-input-id');
-  const roleEl = document.getElementById('rb-input-role');
-  const id = (idEl?.value||'').trim();
-  const role = (roleEl?.value==='LEADER') ? 'LEADER' : 'ENG';
-  if(!id){ showToast('請輸入工號','warning'); idEl?.focus(); return; }
-  // 工號存在性提醒（不阻擋，因為可能先綁定再建檔）
-  let exists = false;
-  try{ exists = engineers.some(e=>e.id===id); }catch(e){}
-  const isUpdate = Object.prototype.hasOwnProperty.call(roleBindings, id);
-  roleBindings[id] = role;
-  if(idEl) idEl.value='';
-  renderRoleBindings();
-  saveRoleBindings();
-  showToast((isUpdate?'✓ 已更新':'✓ 已新增')+'綁定：'+id+' → '+role+(exists?'':'（注意：此工號目前不在人員清單中）'),'success');
+// 新增帳號（LEADER 只能新增 ENG；ADMIN 可選 ENG/LEADER/ADMIN）
+async function addUser(){
+  if(!requireAccountEditor()) return;
+  const account = (document.getElementById('u-add-account')?.value||'').trim();
+  const name    = (document.getElementById('u-add-name')?.value||'').trim();
+  let role = (document.getElementById('u-add-role')?.value||'ENG').toUpperCase();
+  if(!trueIsAdmin()) role = 'ENG';                       // 非 ADMIN 一律 ENG
+  if(!['ADMIN','LEADER','ENG'].includes(role)) role = 'ENG';
+  if(!account){ showToast('請輸入工號','warning'); document.getElementById('u-add-account')?.focus(); return; }
+  try{
+    const r = await fetch(API_URL+'?action=users_add',{
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ account, name, role, password:'' })
+    });
+    const d = await r.json();
+    if(d && d.success){
+      showToast('已新增帳號：'+account+'（'+role+'）','success');
+      const a=document.getElementById('u-add-account'); if(a)a.value='';
+      const n=document.getElementById('u-add-name'); if(n)n.value='';
+      renderRoleBindings();
+    }else{
+      showToast('新增失敗：'+((d&&d.error)||'未知錯誤'),'error');
+    }
+  }catch(e){ showToast('新增失敗：'+e.message,'error'); }
 }
 
-function removeRoleBinding(id){
-  if(!requireLeader()) return;
-  if(!confirm('確定要移除工號 '+id+' 的權限綁定？\n移除後該工號將回到一般登入方式。')) return;
-  delete roleBindings[id];
-  renderRoleBindings();
-  saveRoleBindings();
-  showToast('已移除工號 '+id+' 的綁定','info');
+// 刪除帳號（LEADER 只能刪 ENG；不可刪自己；最後一個 ADMIN 由後端再擋一次）
+async function deleteUser(account){
+  if(!requireAccountEditor()) return;
+  if(String(account).trim().toLowerCase() === String(myAccount).trim().toLowerCase()){
+    showToast('不可刪除自己的帳號','warning'); return;
+  }
+  const target = _usersCache.find(u=>String(u.account).trim().toLowerCase()===String(account).trim().toLowerCase());
+  const tRole = (target?.role||'ENG').toUpperCase();
+  if(!trueIsAdmin() && tRole!=='ENG'){
+    showToast('LEADER 只能刪除 ENG 帳號','warning'); return;
+  }
+  if(!confirm('確定要刪除帳號「'+account+'」？\n刪除後該工號將無法登入。')) return;
+  try{
+    const r = await fetch(API_URL+'?action=users_delete',{
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ account })
+    });
+    const d = await r.json();
+    if(d && d.success){ showToast('已刪除帳號：'+account,'info'); renderRoleBindings(); }
+    else showToast('刪除失敗：'+((d&&d.error)||'未知錯誤'),'error');
+  }catch(e){ showToast('刪除失敗：'+e.message,'error'); }
+}
+
+// 單列即時寫入：角色(ADMIN限定)或姓名一變更就直接寫回 users.json
+async function saveOneUser(account){
+  if(!requireAccountEditor()) return;
+  if(String(account).trim().toLowerCase() === String(myAccount).trim().toLowerCase()) return; // 不改自己
+  const cached = _usersCache.find(u=>String(u.account).trim().toLowerCase()===String(account).trim().toLowerCase());
+  const cRole = (cached?.role||'ENG').toUpperCase();
+  // LEADER 只能改 ENG 列、且不可改角色
+  if(!trueIsAdmin() && cRole!=='ENG'){
+    showToast('LEADER 只能修改 ENG 帳號','warning'); renderRoleBindings(); return;
+  }
+  const sel  = document.querySelector('.rb-role[data-account="'+CSS.escape(account)+'"]');
+  const nmEl = document.querySelector('.rb-name[data-account="'+CSS.escape(account)+'"]');
+  // 角色：ADMIN 由下拉決定；LEADER 一律維持原角色(ENG)
+  const role = (trueIsAdmin() && sel) ? sel.value.toUpperCase() : cRole;
+  const name = nmEl ? nmEl.value.trim() : (cached?cached.name:'');
+  try{
+    const r = await fetch(API_URL+'?action=users_update',{
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ users: [{ account, name, role }] })
+    });
+    const d = await r.json();
+    if(d && d.success){
+      showToast('已寫入 users.json：'+account+'（'+role+'）','success');
+      renderRoleBindings();   // 重抓，保持徽章/最後一個ADMIN鎖等狀態正確
+    }else{
+      throw new Error((d && d.error) || 'save failed');
+    }
+  }catch(e){
+    showToast('寫入失敗：'+e.message,'error');
+    renderRoleBindings();
+  }
 }
 
 
@@ -3166,6 +3313,7 @@ window.addEventListener('DOMContentLoaded', async ()=>{
     safeRun('renderAnalysis', renderAnalysis);
     safeRun('renderRoleBindings', renderRoleBindings);
     safeRun('updateStatusUI', updateStatusUI);
+    safeRun('applyRoleToUI', applyRoleToUI);   // 確保側邊欄最終顯示「登入身分」
   });
   
   // 定期檢查伺服器狀態 (每 60 秒)
