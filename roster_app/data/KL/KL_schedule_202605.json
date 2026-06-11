@@ -1,0 +1,896 @@
+{
+  "site": "KL",
+  "year": 2026,
+  "month": 5,
+  "ym": "202605",
+  "shifts": {
+    "4A": [
+      {
+        "id": "K55555",
+        "name": "454545",
+        "shift": "4A",
+        "group": "A1",
+        "title": "工程師",
+        "seniority": 0,
+        "note": "",
+        "factory": "KL",
+        "hiredate": "",
+        "isMaintenance": false,
+        "days": {
+          "10": {
+            "date": "2026-05-10",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "K18",
+            "leave": 0,
+            "ot": 0,
+            "leaveTemp": 0
+          },
+          "11": {
+            "date": "2026-05-11",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "系統",
+            "leave": 0,
+            "ot": 0,
+            "leaveTemp": 0
+          },
+          "12": {
+            "date": "2026-05-12",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "8F",
+            "leave": 0,
+            "ot": 0,
+            "leaveTemp": 0
+          },
+          "13": {
+            "date": "2026-05-13",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "5F",
+            "leave": 0,
+            "ot": 0,
+            "leaveTemp": 0
+          },
+          "14": {
+            "date": "2026-05-14",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "K21",
+            "leave": 0,
+            "ot": 0,
+            "leaveTemp": 0
+          },
+          "15": {
+            "date": "2026-05-15",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "K25",
+            "leave": 0,
+            "ot": 0,
+            "leaveTemp": 0
+          },
+          "16": {
+            "date": "2026-05-16",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "K18",
+            "leave": 0,
+            "ot": 0,
+            "leaveTemp": 0
+          },
+          "17": {
+            "date": "2026-05-17",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "系統",
+            "leave": 0,
+            "ot": 0,
+            "leaveTemp": 0
+          },
+          "18": {
+            "date": "2026-05-18",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "8F",
+            "leave": 0,
+            "ot": 0,
+            "leaveTemp": 0
+          },
+          "19": {
+            "date": "2026-05-19",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "5F",
+            "leave": 0,
+            "ot": 0,
+            "leaveTemp": 0
+          },
+          "20": {
+            "date": "2026-05-20",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "K21",
+            "leave": 0,
+            "ot": 0,
+            "leaveTemp": 0
+          },
+          "21": {
+            "date": "2026-05-21",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "K25",
+            "leave": 0,
+            "ot": 0,
+            "leaveTemp": 0
+          },
+          "22": {
+            "date": "2026-05-22",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "K18",
+            "leave": 0,
+            "ot": 0,
+            "leaveTemp": 0
+          },
+          "23": {
+            "date": "2026-05-23",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "系統",
+            "leave": 0,
+            "ot": 0,
+            "leaveTemp": 0
+          },
+          "24": {
+            "date": "2026-05-24",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "8F",
+            "leave": 0,
+            "ot": 0,
+            "leaveTemp": 0
+          },
+          "25": {
+            "date": "2026-05-25",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "5F",
+            "leave": 0,
+            "ot": 0,
+            "leaveTemp": 0
+          },
+          "26": {
+            "date": "2026-05-26",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "K21",
+            "leave": 0,
+            "ot": 0,
+            "leaveTemp": 0
+          },
+          "27": {
+            "date": "2026-05-27",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "K25",
+            "leave": 0,
+            "ot": 0,
+            "leaveTemp": 0
+          },
+          "28": {
+            "date": "2026-05-28",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "K18",
+            "leave": 0,
+            "ot": 0,
+            "leaveTemp": 0
+          },
+          "29": {
+            "date": "2026-05-29",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "系統",
+            "leave": 0,
+            "ot": 0,
+            "leaveTemp": 0
+          },
+          "30": {
+            "date": "2026-05-30",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "8F",
+            "leave": 0,
+            "ot": 0,
+            "leaveTemp": 0
+          },
+          "31": {
+            "date": "2026-05-31",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "5F",
+            "leave": 0,
+            "ot": 0,
+            "leaveTemp": 0
+          },
+          "01": {
+            "date": "2026-05-01",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "5F",
+            "leave": 0,
+            "ot": 0,
+            "leaveTemp": 0
+          },
+          "02": {
+            "date": "2026-05-02",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "K21",
+            "leave": 0,
+            "ot": 0,
+            "leaveTemp": 0
+          },
+          "03": {
+            "date": "2026-05-03",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "K25",
+            "leave": 0,
+            "ot": 0,
+            "leaveTemp": 0
+          },
+          "04": {
+            "date": "2026-05-04",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "K18",
+            "leave": 0,
+            "ot": 0,
+            "leaveTemp": 0
+          },
+          "05": {
+            "date": "2026-05-05",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "系統",
+            "leave": 0,
+            "ot": 0,
+            "leaveTemp": 0
+          },
+          "06": {
+            "date": "2026-05-06",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "8F",
+            "leave": 0,
+            "ot": 0,
+            "leaveTemp": 0
+          },
+          "07": {
+            "date": "2026-05-07",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "5F",
+            "leave": 0,
+            "ot": 0,
+            "leaveTemp": 0
+          },
+          "08": {
+            "date": "2026-05-08",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "K21",
+            "leave": 0,
+            "ot": 0,
+            "leaveTemp": 0
+          },
+          "09": {
+            "date": "2026-05-09",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "K25",
+            "leave": 0,
+            "ot": 0,
+            "leaveTemp": 0
+          }
+        },
+        "inactiveFromYm": "202606"
+      },
+      {
+        "id": "K45677",
+        "name": "74",
+        "shift": "4A",
+        "group": "A1",
+        "title": "工程師",
+        "seniority": 5,
+        "note": "",
+        "factory": "KL",
+        "hiredate": "",
+        "isMaintenance": false,
+        "days": {
+          "10": {
+            "date": "2026-05-10",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "8F",
+            "leave": 0,
+            "ot": 0,
+            "leaveTemp": 0
+          },
+          "11": {
+            "date": "2026-05-11",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "5F",
+            "leave": 0,
+            "ot": 0,
+            "leaveTemp": 0
+          },
+          "12": {
+            "date": "2026-05-12",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "K21",
+            "leave": 0,
+            "ot": 0,
+            "leaveTemp": 0
+          },
+          "13": {
+            "date": "2026-05-13",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "K25",
+            "leave": 0,
+            "ot": 0,
+            "leaveTemp": 0
+          },
+          "14": {
+            "date": "2026-05-14",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "K18",
+            "leave": 0,
+            "ot": 0,
+            "leaveTemp": 0
+          },
+          "15": {
+            "date": "2026-05-15",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "系統",
+            "leave": 0,
+            "ot": 0,
+            "leaveTemp": 0
+          },
+          "16": {
+            "date": "2026-05-16",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "8F",
+            "leave": 0,
+            "ot": 0,
+            "leaveTemp": 0
+          },
+          "17": {
+            "date": "2026-05-17",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "5F",
+            "leave": 0,
+            "ot": 0,
+            "leaveTemp": 0
+          },
+          "18": {
+            "date": "2026-05-18",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "K21",
+            "leave": 0,
+            "ot": 0,
+            "leaveTemp": 0
+          },
+          "19": {
+            "date": "2026-05-19",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "K25",
+            "leave": 0,
+            "ot": 0,
+            "leaveTemp": 0
+          },
+          "20": {
+            "date": "2026-05-20",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "K18",
+            "leave": 0,
+            "ot": 0,
+            "leaveTemp": 0
+          },
+          "21": {
+            "date": "2026-05-21",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "系統",
+            "leave": 0,
+            "ot": 0,
+            "leaveTemp": 0
+          },
+          "22": {
+            "date": "2026-05-22",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "8F",
+            "leave": 0,
+            "ot": 0,
+            "leaveTemp": 0
+          },
+          "23": {
+            "date": "2026-05-23",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "5F",
+            "leave": 0,
+            "ot": 0,
+            "leaveTemp": 0
+          },
+          "24": {
+            "date": "2026-05-24",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "K21",
+            "leave": 0,
+            "ot": 0,
+            "leaveTemp": 0
+          },
+          "25": {
+            "date": "2026-05-25",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "K25",
+            "leave": 0,
+            "ot": 0,
+            "leaveTemp": 0
+          },
+          "26": {
+            "date": "2026-05-26",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "K18",
+            "leave": 0,
+            "ot": 0,
+            "leaveTemp": 0
+          },
+          "27": {
+            "date": "2026-05-27",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "系統",
+            "leave": 0,
+            "ot": 0,
+            "leaveTemp": 0
+          },
+          "28": {
+            "date": "2026-05-28",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "8F",
+            "leave": 0,
+            "ot": 0,
+            "leaveTemp": 0
+          },
+          "29": {
+            "date": "2026-05-29",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "5F",
+            "leave": 0,
+            "ot": 0,
+            "leaveTemp": 0
+          },
+          "30": {
+            "date": "2026-05-30",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "K21",
+            "leave": 0,
+            "ot": 0,
+            "leaveTemp": 0
+          },
+          "31": {
+            "date": "2026-05-31",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "K25",
+            "leave": 0,
+            "ot": 0,
+            "leaveTemp": 0
+          },
+          "01": {
+            "date": "2026-05-01",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "K25",
+            "leave": 0,
+            "ot": 0,
+            "leaveTemp": 0
+          },
+          "02": {
+            "date": "2026-05-02",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "K18",
+            "leave": 0,
+            "ot": 0,
+            "leaveTemp": 0
+          },
+          "03": {
+            "date": "2026-05-03",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "系統",
+            "leave": 0,
+            "ot": 0,
+            "leaveTemp": 0
+          },
+          "04": {
+            "date": "2026-05-04",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "8F",
+            "leave": 0,
+            "ot": 0,
+            "leaveTemp": 0
+          },
+          "05": {
+            "date": "2026-05-05",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "5F",
+            "leave": 0,
+            "ot": 0,
+            "leaveTemp": 0
+          },
+          "06": {
+            "date": "2026-05-06",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "K21",
+            "leave": 0,
+            "ot": 0,
+            "leaveTemp": 0
+          },
+          "07": {
+            "date": "2026-05-07",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "K25",
+            "leave": 0,
+            "ot": 0,
+            "leaveTemp": 0
+          },
+          "08": {
+            "date": "2026-05-08",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "K18",
+            "leave": 0,
+            "ot": 0,
+            "leaveTemp": 0
+          },
+          "09": {
+            "date": "2026-05-09",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "系統",
+            "leave": 0,
+            "ot": 0,
+            "leaveTemp": 0
+          }
+        },
+        "inactiveFromYm": "202606"
+      }
+    ],
+    "4B": [
+      {
+        "id": "K78945",
+        "name": "52245",
+        "shift": "4B",
+        "group": "C1",
+        "title": "資深工程師",
+        "seniority": 0,
+        "note": "",
+        "factory": "KL",
+        "hiredate": "",
+        "isMaintenance": false,
+        "days": {
+          "10": {
+            "date": "2026-05-10",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "系統",
+            "leave": 0,
+            "ot": 0,
+            "leaveTemp": 0
+          },
+          "11": {
+            "date": "2026-05-11",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "K25",
+            "leave": 0,
+            "ot": 0,
+            "leaveTemp": 0
+          },
+          "12": {
+            "date": "2026-05-12",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "K21",
+            "leave": 0,
+            "ot": 0,
+            "leaveTemp": 0
+          },
+          "13": {
+            "date": "2026-05-13",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "8F",
+            "leave": 0,
+            "ot": 0,
+            "leaveTemp": 0
+          },
+          "14": {
+            "date": "2026-05-14",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "5F",
+            "leave": 0,
+            "ot": 0,
+            "leaveTemp": 0
+          },
+          "15": {
+            "date": "2026-05-15",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "K18",
+            "leave": 0,
+            "ot": 0,
+            "leaveTemp": 0
+          },
+          "16": {
+            "date": "2026-05-16",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "系統",
+            "leave": 0,
+            "ot": 0,
+            "leaveTemp": 0
+          },
+          "17": {
+            "date": "2026-05-17",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "K25",
+            "leave": 0,
+            "ot": 0,
+            "leaveTemp": 0
+          },
+          "18": {
+            "date": "2026-05-18",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "K21",
+            "leave": 0,
+            "ot": 0,
+            "leaveTemp": 0
+          },
+          "19": {
+            "date": "2026-05-19",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "8F",
+            "leave": 0,
+            "ot": 0,
+            "leaveTemp": 0
+          },
+          "20": {
+            "date": "2026-05-20",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "5F",
+            "leave": 0,
+            "ot": 0,
+            "leaveTemp": 0
+          },
+          "21": {
+            "date": "2026-05-21",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "K18",
+            "leave": 0,
+            "ot": 0,
+            "leaveTemp": 0
+          },
+          "22": {
+            "date": "2026-05-22",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "系統",
+            "leave": 0,
+            "ot": 0,
+            "leaveTemp": 0
+          },
+          "23": {
+            "date": "2026-05-23",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "K25",
+            "leave": 0,
+            "ot": 0,
+            "leaveTemp": 0
+          },
+          "24": {
+            "date": "2026-05-24",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "K21",
+            "leave": 0,
+            "ot": 0,
+            "leaveTemp": 0
+          },
+          "25": {
+            "date": "2026-05-25",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "8F",
+            "leave": 0,
+            "ot": 0,
+            "leaveTemp": 0
+          },
+          "26": {
+            "date": "2026-05-26",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "5F",
+            "leave": 0,
+            "ot": 0,
+            "leaveTemp": 0
+          },
+          "27": {
+            "date": "2026-05-27",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "K18",
+            "leave": 0,
+            "ot": 0,
+            "leaveTemp": 0
+          },
+          "28": {
+            "date": "2026-05-28",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "系統",
+            "leave": 0,
+            "ot": 0,
+            "leaveTemp": 0
+          },
+          "29": {
+            "date": "2026-05-29",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "K25",
+            "leave": 0,
+            "ot": 0,
+            "leaveTemp": 0
+          },
+          "30": {
+            "date": "2026-05-30",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "K21",
+            "leave": 0,
+            "ot": 0,
+            "leaveTemp": 0
+          },
+          "31": {
+            "date": "2026-05-31",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "8F",
+            "leave": 0,
+            "ot": 0,
+            "leaveTemp": 0
+          },
+          "01": {
+            "date": "2026-05-01",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "8F",
+            "leave": 0,
+            "ot": 0,
+            "leaveTemp": 0
+          },
+          "02": {
+            "date": "2026-05-02",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "5F",
+            "leave": 0,
+            "ot": 0,
+            "leaveTemp": 0
+          },
+          "03": {
+            "date": "2026-05-03",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "K18",
+            "leave": 0,
+            "ot": 0,
+            "leaveTemp": 0
+          },
+          "04": {
+            "date": "2026-05-04",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "系統",
+            "leave": 0,
+            "ot": 0,
+            "leaveTemp": 0
+          },
+          "05": {
+            "date": "2026-05-05",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "K25",
+            "leave": 0,
+            "ot": 0,
+            "leaveTemp": 0
+          },
+          "06": {
+            "date": "2026-05-06",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "K21",
+            "leave": 0,
+            "ot": 0,
+            "leaveTemp": 0
+          },
+          "07": {
+            "date": "2026-05-07",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "8F",
+            "leave": 0,
+            "ot": 0,
+            "leaveTemp": 0
+          },
+          "08": {
+            "date": "2026-05-08",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "5F",
+            "leave": 0,
+            "ot": 0,
+            "leaveTemp": 0
+          },
+          "09": {
+            "date": "2026-05-09",
+            "type": "ON",
+            "typeLabel": "出勤",
+            "loc": "K18",
+            "leave": 0,
+            "ot": 0,
+            "leaveTemp": 0
+          }
+        },
+        "inactiveFromYm": "202606"
+      }
+    ],
+    "5A": [],
+    "5B": []
+  }
+}

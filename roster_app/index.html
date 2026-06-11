@@ -9,10 +9,20 @@
   try { if (!sessionStorage.getItem('dsm_login')) location.replace('login.html'); }
   catch (e) { location.replace('login.html'); }
 </script>
-<link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/css/bootstrap.min.css" rel="stylesheet">
-<link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-icons/1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
-<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css">
+<link href="static/css/bootstrap.min.css" rel="stylesheet">
+<link href="static/css/bootstrap-icons.css" rel="stylesheet">
+<link href="static/css/css2.css" rel="stylesheet">
+<link rel="stylesheet" href="static/css/styles.css">
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0;}
+    @font-face {
+      font-display:block;
+      font-family:"bootstrap-icons";
+      src:
+        url("static/fonts/bootstrap-icons.woff2") format("woff2"),
+        url("static/fonts/bootstrap-icons.woff") format("woff");
+    }
+  </style>
 </head>
 <body>
 
@@ -774,7 +784,21 @@
       <div class="modal-body" style="padding:24px;text-align:center">
         <div style="width:56px;height:56px;border-radius:50%;background:rgba(255,71,87,.1);display:flex;align-items:center;justify-content:center;margin:0 auto 12px;font-size:26px;color:var(--danger)"><i class="bi bi-trash3-fill"></i></div>
         <div style="font-size:15px;font-weight:700;margin-bottom:6px">確定要刪除此人員嗎？</div>
-        <div style="font-size:13px;color:var(--text-muted)">此操作無法復原</div>
+        <div style="font-size:13px;color:var(--text-muted)">
+          請選擇從哪個月份開始移除此人員；選定月份以前的歷史排班會保留
+        </div>
+
+        <div style="margin-top:14px;text-align:left">
+          <label class="form-label" style="font-size:12px;font-weight:700;color:var(--text-muted)">
+            移除生效月份
+          </label>
+          <select class="form-select form-select-sm" id="del-from-month">
+            <!-- 由 app.js 動態產生 -->
+          </select>
+          <div style="font-size:11px;color:var(--danger);margin-top:6px;line-height:1.5">
+            例：選 2026/08，代表 2026/08 含往後月份移除；2026/07 以前保留。
+          </div>
+        </div>
         <div style="background:var(--main-bg);border-radius:10px;padding:12px;margin-top:14px">
           <div style="font-size:13px;font-weight:700" id="del-name">—</div>
           <div style="font-size:12px;color:var(--text-muted);margin-top:3px"><span id="del-id"></span></div>
@@ -906,9 +930,9 @@
 <!-- TOAST -->
 <div class="toast-container" id="toast-container"></div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/js/bootstrap.bundle.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-<script src="app.js"></script>
+<script src="static/js/package/bootstrap.bundle.min.js"></script>
+<script src="static/js/package/chart.umd.min.js"></script>
+<script src="static/js/package/html2canvas.min.js"></script>
+<script src="static/js/app.js"></script>
 </body>
 </html>

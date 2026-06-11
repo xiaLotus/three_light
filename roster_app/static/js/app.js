@@ -13,6 +13,25 @@ const PREVIEW_MODE = false;
    - 若 Flask 跑在別台機器（多人連線），把 127.0.0.1 改成該主機 IP，
      例如 'http://192.168.1.50:5000/api'。 */
 const API_URL = 'http://127.0.0.1:5000/api';
+
+/* ── 審計日誌：所有打向後端的請求自動附上操作者工號（X-Operator）──
+   後端 loguru 據此記錄「誰、何時、做了什麼、改了哪一格」。 */
+(function(){
+  const _fetch = window.fetch.bind(window);
+  window.fetch = function(url, opt){
+    try{
+      if(typeof url === 'string' && url.indexOf(API_URL) === 0){
+        const login = JSON.parse(sessionStorage.getItem('dsm_login') || 'null');
+        if(login && login.account){
+          opt = opt || {};
+          opt.headers = Object.assign({}, opt.headers || {},
+                                      {'X-Operator': String(login.account)});
+        }
+      }
+    }catch(e){}
+    return _fetch(url, opt);
+  };
+})();
 /* 在 API 動作後附加站台參數，使每個站台讀寫各自的 data/<site>/ 資料夾 */
 function siteQ(){ return '&site=' + currentSite; }
 
@@ -448,9 +467,11 @@ async function refreshLockStatus(){
   }
 }
 
+
 async function doLogout(){
   if(!confirm('確定要登出系統嗎？')) return;
-  // 釋放鎖
+
+  // 釋放目前站台 Leader 鎖
   if(isLeader() && myLockToken && !PREVIEW_MODE){
     try{
       await fetch(API_URL+'?action=lock_release'+siteQ(),{
@@ -460,14 +481,26 @@ async function doLogout(){
       });
     }catch(e){}
   }
+
   stopHeartbeat();
+
   myLockToken = '';
   currentRole = null;
+  myIntendedRole = 'ENG';
   myName = '';
-  try{ sessionStorage.removeItem(LS_KEY_SESSION); }catch(e){}
-  try{ sessionStorage.removeItem('dsm_login'); }catch(e){}
+  myAccount = '';
+
+  try{
+    sessionStorage.removeItem(LS_KEY_SESSION);
+    sessionStorage.removeItem('dsm_login');
+
+    // 重點：清掉站台記憶，避免下次登入自動進 KL / NK
+    sessionStorage.removeItem('dsm_site');
+  }catch(e){}
+
   location.replace('login.html');
 }
+
 
 function applyRoleToUI(){
   document.body.setAttribute('data-role', currentRole||'NONE');
@@ -651,94 +684,141 @@ function updateStatusUI(){
   }
 }
 
-// ─── 將「月份班表檔」格式轉成系統用的 engineers + scheduleData ───
-//   months: { "202606": {site,year,month,ym,shifts:{4A:[...],4B:[...],5A:[...],5B:[...]}}, ... }
+
 function scheduleMonthsToData(months){
-  const engMap = {};   // id → 人員
-  const sched  = {};   // id → { 'YYYY-MM-DD': {type,loc,leave,ot} }
-  Object.keys(months).forEach(ym=>{
+  const engMap = {};
+  const sched  = {};
+
+  Object.keys(months).forEach(ym => {
     const md = months[ym] || {};
-    const shifts = md.shifts || md;            // 容錯：直接給 shifts 也可
-    ['4A','4B','5A','5B'].forEach(sh=>{
-      (shifts[sh] || []).forEach(p=>{
+    const shifts = md.shifts || md;
+
+    ['4A','4B','5A','5B'].forEach(sh => {
+      (shifts[sh] || []).forEach(p => {
+        if(!p || !p.id) return;
+
         if(!engMap[p.id]){
           engMap[p.id] = {
-            id: p.id, name: p.name,
+            id: p.id,
+            name: p.name,
             shift: p.shift || sh,
-            group: p.group, title: p.title,
-            seniority: (p.seniority!=null ? p.seniority : 0),
+            group: p.group,
+            title: p.title,
+            seniority: (p.seniority != null ? p.seniority : 0),
             note: p.note || '',
-            factory: currentSite
+            factory: p.factory || currentSite,
+            hiredate: p.hiredate || '',
+            inactiveFromYm: p.inactiveFromYm || ''
           };
         }
+
+        if(p.inactiveFromYm){
+          engMap[p.id].inactiveFromYm = p.inactiveFromYm;
+        }
+
         sched[p.id] = sched[p.id] || {};
+
         const days = p.days || {};
-        Object.keys(days).forEach(dd=>{
+
+        Object.keys(days).forEach(dd => {
           const c = days[dd] || {};
-          const key = c.date || (ym.slice(0,4)+'-'+ym.slice(4,6)+'-'+dd);
+          const key = c.date || (ym.slice(0,4) + '-' + ym.slice(4,6) + '-' + dd);
+
           sched[p.id][key] = {
             type: c.type || 'ON',
             loc:  c.loc  || '',
             leave: c.leave || 0,
-            ot:   c.ot    || 0
+            ot:   c.ot    || 0,
+            leaveTemp: c.leaveTemp || 0
           };
         });
       });
     });
   });
-  return { engineers: Object.values(engMap), scheduleData: sched, config: null };
+
+  return {
+    engineers: Object.values(engMap),
+    scheduleData: sched,
+    config: null
+  };
 }
 
-// ─── 從伺服器載入所有資料 ───
-//   主要來源 = 月份班表檔 <site>_schedule_YYYYMM.json（+ meta.json 設定/最後修改）
-//   後備 = 舊版 alldata.json
-async function serverLoadAllData(){
-  if(PREVIEW_MODE){ _serverOnline = false; return null; }
 
-  // 1) 月份班表檔（主要來源；顯示與寫入同一份）
+async function serverLoadAllData(){
+  if(PREVIEW_MODE){
+    _serverOnline = false;
+    return null;
+  }
+
+  // 1. 月份班表檔：主要來源
   try{
-    const r = await fetch(API_URL+'?action=load_schedule'+siteQ(),{cache:'no-store'});
+    const r = await fetch(API_URL + '?action=load_schedule' + siteQ(), {cache:'no-store'});
+
     if(r.ok){
       const d = await r.json();
       _serverOnline = true;
+
+      // 只要後端有回傳 months，而且有任何月份 key，就代表該站台已有正式資料。
+      // 即使 engineers.length === 0，也要視為有效空白資料。
       if(d && d.success && d.months && Object.keys(d.months).length){
         const conv = scheduleMonthsToData(d.months);
-        if(conv.engineers.length){
-          const meta = d.meta || {};
-          if(meta.savedAt || meta.savedBy){
-            _lastModifiedInfo = { savedAt: meta.savedAt||null, savedBy: meta.savedBy||null };
-          }
-          conv.config = meta.config || null;
-          console.log('✅ ['+siteName(currentSite)+'] 由月份班表檔載入：'+Object.keys(d.months).sort().join(', '));
-          return conv;
+        const meta = d.meta || {};
+
+        if(meta.savedAt || meta.savedBy){
+          _lastModifiedInfo = {
+            savedAt: meta.savedAt || null,
+            savedBy: meta.savedBy || null
+          };
         }
+
+        conv.config = meta.config || null;
+
+        console.log(
+          '✅ [' + siteName(currentSite) + '] 由月份班表檔載入：' +
+          Object.keys(d.months).sort().join(', ') +
+          '，人員數：' + conv.engineers.length
+        );
+
+        return conv;
       }
     }
   }catch(e){
     console.warn('load_schedule failed:', e.message);
     _serverOnline = false;
-    return null;   // 連不上 → 交給 localStorage 快取
+    return null;
   }
 
-  // 2) 後備：舊版 alldata.json
-  try{
-    const r2 = await fetch(API_URL+'?action=load'+siteQ(),{cache:'no-store'});
-    if(r2.ok){
-      const data = await r2.json();
-      if(data && data.engineers && data.scheduleData){
-        _serverOnline = true;
-        _lastModifiedInfo = { savedAt: data.savedAt||null, savedBy: data.savedBy||null };
-        return {engineers: data.engineers, scheduleData: data.scheduleData, config: data.config||null};
-      }
-    }
-  }catch(e){}
+  // 2. 舊版 alldata.json fallback
+  // 只允許 A3 使用，避免 KL / NK 被舊資料污染。
+  if(currentSite === 'A3'){
+    try{
+      const r2 = await fetch(API_URL + '?action=load' + siteQ(), {cache:'no-store'});
 
+      if(r2.ok){
+        const data = await r2.json();
+
+        if(data && Array.isArray(data.engineers) && data.scheduleData){
+          _serverOnline = true;
+          _lastModifiedInfo = {
+            savedAt: data.savedAt || null,
+            savedBy: data.savedBy || null
+          };
+
+          return {
+            engineers: data.engineers,
+            scheduleData: data.scheduleData,
+            config: data.config || null
+          };
+        }
+      }
+    }catch(e){}
+  }
+
+  // KL / NK 沒有正式月份檔時，直接回 null，讓 initLoadData 建立空白名單
   return null;
 }
 
-// ─── 反向轉換：系統 engineers + scheduleData → 月份班表檔格式 ───
-//   產生 { "202606": {site,year,month,ym,shifts:{4A:[...],...}}, ... }
-//   月份依 scheduleData 內實際出現的日期自動歸納。
+
 function dataToScheduleMonths(){
   const TYPE_LABEL = { ON:'出勤', REST:'休息', HOLIDAY:'例假', LEAVE:'加班日' };
   const months = {};
@@ -747,53 +827,131 @@ function dataToScheduleMonths(){
     if(!months[ym]){
       months[ym] = {
         site: currentSite,
-        year: parseInt(ym.slice(0,4),10),
-        month: parseInt(ym.slice(4,6),10),
+        year: parseInt(ym.slice(0,4), 10),
+        month: parseInt(ym.slice(4,6), 10),
         ym,
         shifts: {'4A':[],'4B':[],'5A':[],'5B':[]},
         _map: {}
       };
     }
+
     return months[ym];
   }
 
-  engineers.forEach(eng=>{
+  engineers.forEach(eng => {
     const sd = scheduleData[eng.id] || {};
-    Object.keys(sd).forEach(dateKey=>{
-      // dateKey = 'YYYY-MM-DD'
-      const ym = dateKey.slice(0,4) + dateKey.slice(5,7);
+
+    Object.keys(sd).forEach(dateKey => {
+      const ym = ymFromDateKey(dateKey);
+      if(!ym) return;
+
+      if(eng.inactiveFromYm && ym >= eng.inactiveFromYm){
+        return;
+      }
+
       const M = ensureMonth(ym);
       let person = M._map[eng.id];
+
       if(!person){
         const sh = (eng.shift && M.shifts[eng.shift]) ? eng.shift : '4A';
+
         person = {
-          id: eng.id, name: eng.name,
+          id: eng.id,
+          name: eng.name,
           shift: eng.shift || sh,
-          group: eng.group, title: eng.title,
-          seniority: (eng.seniority!=null ? eng.seniority : 0),
+          group: eng.group,
+          title: eng.title,
+          seniority: (eng.seniority != null ? eng.seniority : 0),
           note: eng.note || '',
+          factory: eng.factory || currentSite,
+          hiredate: eng.hiredate || '',
           isMaintenance: eng.title === '保養組',
           days: {}
         };
+
+        if(eng.inactiveFromYm){
+          person.inactiveFromYm = eng.inactiveFromYm;
+        }
+
         M._map[eng.id] = person;
-        (M.shifts[sh]).push(person);
+        M.shifts[sh].push(person);
       }
+
       const c = sd[dateKey] || {};
-      const dd = dateKey.slice(8,10);
+      const dd = dateKey.slice(8, 10);
+
       person.days[dd] = {
         date: dateKey,
         type: c.type || 'ON',
-        typeLabel: TYPE_LABEL[c.type] || (c.type||'ON'),
+        typeLabel: TYPE_LABEL[c.type] || (c.type || 'ON'),
         loc: c.loc || '',
         leave: c.leave || 0,
-        ot: c.ot || 0
+        ot: c.ot || 0,
+        leaveTemp: c.leaveTemp || 0
       };
     });
   });
 
-  Object.values(months).forEach(M=>{ delete M._map; });
+  try{
+    AVAIL_MONTHS.forEach(({year, month}) => {
+      const ym = ymFromYearMonth(year, month);
+      ensureMonth(ym);
+    });
+  }catch(e){
+    console.warn('ensure empty months failed:', e);
+  }
+
+  Object.values(months).forEach(M => {
+    delete M._map;
+  });
+
   return months;
 }
+
+/* ════════════════════════════════════════════════════════
+   值班名單 roster：每站台獨立檔 data/<site>/roster.json
+   - 與 users.json（登入帳號）分離；正式名單來源
+   - 新增人員：後端 roster_add 做工號唯一性檢查（users.json
+     已存在 → 409 拒絕），通過後同寫 roster.json + users.json(ENG)
+   ════════════════════════════════════════════════════════ */
+async function fetchRoster(){
+  if(PREVIEW_MODE) return [];
+  try{
+    const r = await fetch(API_URL + '?action=roster_load&site=' + encodeURIComponent(currentSite), {cache:'no-store'});
+    const d = await r.json();
+    if(r.ok && d && d.success && Array.isArray(d.people)) return d.people;
+  }catch(e){ console.warn('讀取值班名單 roster.json 失敗：', e); }
+  return [];
+}
+
+// 移除是否已生效（inactiveFromYm ≤ 本月 → 此人已不在現役名冊）
+function isRosterExpired(p){
+  if(!p || !p.inactiveFromYm) return false;
+  const now = todayNow();
+  const nowYm = ymFromYearMonth(now.getFullYear(), now.getMonth());
+  return String(p.inactiveFromYm) <= nowYm;
+}
+
+// 把目前 engineers 同步回該站 roster.json（編輯姓名/班別/移除標記後呼叫）
+// roster.json = 現役名冊：移除已生效者不寫入（歷史排班仍保留於月份檔）；
+// 未來才生效的移除 → 保留並帶 inactiveFromYm 標記，時間到自動清除。
+async function syncRosterSave(){
+  if(PREVIEW_MODE) return;
+  try{
+    const people = engineers.filter(e => !isRosterExpired(e)).map(e => ({
+      id: e.id, name: e.name, shift: e.shift, group: e.group,
+      title: e.title, seniority: e.seniority || 0, note: e.note || '',
+      factory: e.factory || currentSite, hiredate: e.hiredate || '',
+      isMaintenance: !!(e.isMaintenance || e.title === '保養組'),
+      inactiveFromYm: e.inactiveFromYm || ''
+    }));
+    await fetch(API_URL + '?action=roster_save&site=' + encodeURIComponent(currentSite), {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({people})
+    });
+  }catch(e){ console.warn('同步 roster.json 失敗：', e); }
+}
+
 
 // ─── 儲存到伺服器（寫入月份班表檔，與顯示同一份）───
 async function serverSave(){
@@ -881,6 +1039,99 @@ function lsSave(){
   if(saveInd){ saveInd.textContent='修改中...'; saveInd.style.color='var(--accent)'; }
 }
 
+
+function sleepMs(ms){
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+// 切換頁面前，如果有防抖存檔尚未執行，先強制寫入後端
+async function flushPendingSaveBeforeReload(){
+  try{
+    if(_saveTimer){
+      clearTimeout(_saveTimer);
+      _saveTimer = null;
+      await serverSave();
+    }
+
+    // 如果剛好正在存檔，等它結束
+    const start = Date.now();
+    while(_saving && Date.now() - start < 5000){
+      await sleepMs(100);
+    }
+  }catch(e){
+    console.warn('flushPendingSaveBeforeReload failed:', e);
+  }
+}
+
+// 只重新撈目前站台資料，不吃 localStorage、不建預設資料
+async function reloadCurrentSiteDataFromServer(){
+  if(PREVIEW_MODE) return false;
+
+  // 先把目前修改寫入，避免重撈時被舊資料蓋掉
+  await flushPendingSaveBeforeReload();
+
+  try{
+    const serverData = await serverLoadAllData();
+
+    if(
+      serverData &&
+      Array.isArray(serverData.engineers) &&
+      serverData.scheduleData &&
+      typeof serverData.scheduleData === 'object'
+    ){
+      engineers = serverData.engineers;
+      scheduleData = serverData.scheduleData;
+
+      if(serverData.config){
+        const c = serverData.config;
+
+        const nameEl = document.getElementById('setting-admin-name');
+        const idEl   = document.getElementById('setting-admin-id');
+
+        if(nameEl && c.adminName) nameEl.value = c.adminName;
+        if(idEl && c.adminId) idEl.value = c.adminId;
+
+        if(typeof applyAdminConfig === 'function'){
+          applyAdminConfig(c);
+        }
+      }
+
+      // 補建目前可見月份，但不建立 KL / NK 預設人員
+      try{
+        if(typeof ensureVisibleMonthsBuilt === 'function'){
+          ensureVisibleMonthsBuilt();
+        }
+      }catch(e){}
+
+      try{
+        refreshLastModifiedUI();
+        updateStatusUI();
+      }catch(e){}
+
+      console.log('✅ [' + currentSite + '] sidebar 切換時已重新撈取後端資料，目前人員數：' + engineers.length);
+
+      return true;
+    }
+
+    console.warn('reloadCurrentSiteDataFromServer：後端沒有有效資料');
+    return false;
+  }catch(e){
+    console.warn('reloadCurrentSiteDataFromServer failed:', e);
+    return false;
+  }
+}
+
+// 依照目前頁面重新渲染
+function renderCurrentPage(page){
+  if(page === 'dashboard') buildDashboard();
+  if(page === 'schedule') renderSchedule();
+  if(page === 'calendar') renderCalendar();
+  if(page === 'personnel') renderPersonnel();
+  if(page === 'analysis') renderAnalysis();
+  if(page === 'settings') renderRoleBindings();
+}
+
+
 // ─── 初始載入 (伺服器 → localStorage 快取 → 預設) ───
 async function initLoadData(){
   let loadedFrom = null;
@@ -927,15 +1178,57 @@ async function initLoadData(){
 
   // 3. 若步驟 1、2 載入成功 → 執行 schema migration（保養組僅屬 A3）
   if(loadedFrom){
-    const added = (currentSite === 'A3') ? mergeMaintenanceData() : 0;
-    if(added > 0){
-      console.log(`✅ Schema migration：補回 ${added} 位保養組人員`);
-      showToast('系統升級：已自動補回 '+added+' 位保養組人員與其 6-9 月排班','info');
-      try{ serverSave(); }catch(e){}
-    }
+    // ── 值班工程師名冊真實來源：data/<site>/roster.json（各廠獨立）──
+    // 名冊（人員與屬性：姓名/班別/組別/職稱…）以 roster.json 為準；
+    // 月份檔只負責排班資料(days)。
+    // 月份檔有、roster 沒有的人 → 視為 roster 建檔前新增，自動遷移寫回 roster.json。
+    try{
+      const rosterPeople = await fetchRoster();
+      if(rosterPeople.length > 0){
+        const legacy = engineers;                       // 月份檔/快取載入的舊名單
+        const legacyMap = new Map(legacy.map(e => [String(e.id), e]));
+        let dirty = false, migrated = 0, joined = 0;
+
+        engineers = rosterPeople.map(p => {
+          const out = {...p, factory: p.factory || currentSite};
+          const old = legacyMap.get(String(p.id));
+          // 移除標記：月份檔已有設定而 roster 尚未記錄 → 帶回並回寫
+          if(old && old.inactiveFromYm && !out.inactiveFromYm){
+            out.inactiveFromYm = old.inactiveFromYm; dirty = true;
+          }
+          if(isRosterExpired(out)) dirty = true;        // 移除已生效 → 觸發回寫時自 roster 清除
+          if(!old) joined++;                            // roster 有、月份檔沒有 → 新人入列
+          return out;
+        });
+
+        legacy.forEach(e => {                           // 月份檔有、roster 沒有
+          if(!engineers.some(x => String(x.id) === String(e.id))){
+            engineers.push({...e});                     // 進記憶體（歷史月份仍要顯示）
+            if(!isRosterExpired(e)){                    // 僅「現役/未來移除」才遷移進 roster
+              migrated++; dirty = true;
+            }
+          }
+        });
+
+        if(joined > 0 || migrated > 0){
+          AVAIL_MONTHS.forEach(({year, month}) => buildScheduleForMonth(year, month));
+          try{ serverSave(); }catch(e){}
+        }
+        if(dirty) syncRosterSave();
+        if(migrated > 0) console.log('✅ 月份檔 ' + migrated + ' 位人員已遷移至 roster.json');
+        if(joined > 0) console.log('✅ 依 roster.json 補入 ' + joined + ' 位值班人員');
+      }else if(engineers.length > 0){
+        // roster.json 不存在/被清空，但月份檔有人 → 自我修復：用現有名單重建 roster.json
+        syncRosterSave();
+        console.log('ℹ️ roster.json 為空，已依月份檔名單重建');
+      }
+    }catch(e){ console.warn('roster 名冊同步失敗：', e); }
     if(loadedFrom === 'server'){
       console.log('✅ ['+currentSite+'] 資料從伺服器載入');
-      showToast('['+siteName(currentSite)+'] 資料已載入 ('+engineers.length+' 人)','success');
+      showToast(
+        '[' + siteName(currentSite) + '] 資料已載入（' + getCurrentMonthPersonCountText() + '）',
+        'success'
+      );
     } else {
       console.log('✅ ['+currentSite+'] 資料從本機快取載入');
       showToast('['+siteName(currentSite)+'] '+(PREVIEW_MODE?'預覽資料已載入':'快取資料已載入'),'info');
@@ -944,24 +1237,24 @@ async function initLoadData(){
   }
   
   // 4. 嘗試舊版 localStorage（僅 A3 沿用舊單站資料）
-  if(currentSite==='A3'){
-    try{
-      const eng=localStorage.getItem('dsm_engineers_v1');
-      const sch=localStorage.getItem('dsm_schedule_v1');
-      if(eng && sch){
-        engineers=JSON.parse(eng);
-        scheduleData=JSON.parse(sch);
-        const added = mergeMaintenanceData();
-        console.log('✅ 資料從舊版 localStorage 遷移'+(added?` (+${added} 位保養組)`:''));
-        showToast('資料已從舊版儲存遷移'+(added?`，並補回 ${added} 位保養組人員`:''),'info');
-        setTimeout(()=>serverSave(), 500);
-        return;
+// 只允許 A3 使用本機快取。
+// KL / NK 不吃 localStorage，避免舊測試資料自動出現。
+if(currentSite === 'A3'){
+  try{
+    const raw = localStorage.getItem(cacheKey());
+    if(raw){
+      const data = JSON.parse(raw);
+      if(data && Array.isArray(data.engineers) && data.scheduleData){
+        engineers = data.engineers;
+        scheduleData = data.scheduleData;
+        loadedFrom = 'cache';
       }
-    }catch(e){}
-  }
+    }
+  }catch(e){}
+}
   
   // 5. 此站台尚無資料 → 建立預設（A3 用完整範本；KL/NK 為空白，待使用者新增人員）
-  buildDefaultData();
+  await buildDefaultData();
   console.log('ℹ️ ['+currentSite+'] 建立預設資料（'+engineers.length+' 人）');
   if(engineers.length > 0){
     showToast('['+siteName(currentSite)+'] 已建立預設資料，可開始編輯','info');
@@ -971,15 +1264,14 @@ async function initLoadData(){
   }
 }
 
-/* 建立預設資料：
-   - A3：用內建範本（這份範本就是 A3 的 64 人名單）+ 排班 + 保養組
-   - KL / NK：空白名單（各廠人員不同，由使用者自行於「人員管理」新增） */
-function buildDefaultData(){
-  if(currentSite === 'A3'){
-    engineers = ENGINEERS.map(e=>({...e, factory: 'A3'}));  // A3 範本
-    buildSchedule();   // 重建 scheduleData 並套用保養組
+/* 建立預設資料：名單一律來自該站 data/<site>/roster.json
+   - A3：roster.json 內含 64 人（含保養組）
+   - KL / NK：roster.json 目前為空 → 空白名單，由 Leader 於「人員管理」新增 */
+async function buildDefaultData(){
+  engineers = (await fetchRoster()).map(e => ({...e, factory: e.factory || currentSite}));
+  if(engineers.length > 0){
+    buildSchedule();
   }else{
-    engineers = [];        // KL / NK 從空白開始
     scheduleData = {};
   }
 }
@@ -1122,11 +1414,11 @@ function importBackup(){
 }
 
 /* ── 清除所有資料（重置） ── */
-function resetAllData(){
+async function resetAllData(){
   if(!requireLeader()) return;
   if(!confirm('⚠️ 確定要清除所有已儲存的資料，回復到初始狀態嗎？\n此操作無法復原！')) return;
   try{ localStorage.removeItem(cacheKey()); localStorage.removeItem('dsm_engineers_v1'); localStorage.removeItem('dsm_schedule_v1'); localStorage.removeItem('dsm_config_v1'); }catch(e){}
-  engineers=[...ENGINEERS.map(e=>({...e}))];
+  engineers = (await fetchRoster()).map(e => ({...e}));
   buildSchedule();
   lsSave();
   buildDashboard();renderSchedule();renderCalendar();renderPersonnel();renderAnalysis();
@@ -1134,202 +1426,12 @@ function resetAllData(){
 }
 
 /* ========================================================
-   DATA — from 六月值班加班預排表_V1_Security_C.xlsx
+   結構設定（人員名單已外移至 data/<site>/roster.json）
    ======================================================== */
 const GROUPS_MAP={'4A':['A1','A2','A3'],'5A':['Z1','Z2','Z3'],'4B':['C1','C2','C3'],'5B':['X1','X2','X3']};
 
-const ENGINEERS=[
-  // 4A - A1
-  {id:'F8129',name:'許育誌',shift:'4A',group:'A1',title:'工程師',seniority:5,note:''},
-  {id:'G2705',name:'廖格徹',shift:'4A',group:'A1',title:'工程師',seniority:3,note:''},
-  {id:'G6777',name:'高敬評',shift:'4A',group:'A1',title:'技術員',seniority:4,note:''},
-  {id:'K19035',name:'徐維佑',shift:'4A',group:'A1',title:'工程師',seniority:4,note:''},
-  // 4A - A2
-  {id:'F8942',name:'黃建倫',shift:'4A',group:'A2',title:'資深工程師',seniority:7,note:'A2班長'},
-  {id:'F6354',name:'陳俊彥',shift:'4A',group:'A2',title:'工程師',seniority:5,note:''},
-  {id:'G1530',name:'韓俊傑',shift:'4A',group:'A2',title:'工程師',seniority:3,note:''},
-  {id:'K12931',name:'伊鴻傑',shift:'4A',group:'A2',title:'工程師',seniority:4,note:''},
-  {id:'K21423',name:'周韋丞',shift:'4A',group:'A2',title:'技術員',seniority:2,note:''},
-  // 4A - A3
-  {id:'G4535',name:'陳思維',shift:'4A',group:'A3',title:'工程師',seniority:5,note:'A3班長'},
-  {id:'D8977',name:'陳彥名',shift:'4A',group:'A3',title:'工程師',seniority:4,note:''},
-  {id:'K22214',name:'王健羽',shift:'4A',group:'A3',title:'技術員',seniority:3,note:''},
-  {id:'K16514',name:'翁碩成',shift:'4A',group:'A3',title:'資深工程師',seniority:6,note:''},
-  {id:'K26285',name:'邱立承',shift:'4A',group:'A3',title:'工程師',seniority:2,note:''},
-  // 4B - C1
-  {id:'C2879',name:'王喬瑋',shift:'4B',group:'C1',title:'工程師',seniority:5,note:'C1班長'},
-  {id:'G0181',name:'吳培銘',shift:'4B',group:'C1',title:'工程師',seniority:4,note:''},
-  {id:'K18736',name:'張彥夫',shift:'4B',group:'C1',title:'技術員',seniority:3,note:''},
-  {id:'K15793',name:'謝秉福',shift:'4B',group:'C1',title:'工程師',seniority:4,note:''},
-  // 4B - C2
-  {id:'B2779',name:'吳凱瑋',shift:'4B',group:'C2',title:'工程師',seniority:5,note:'C2班長'},
-  {id:'K14001',name:'巫宇穎',shift:'4B',group:'C2',title:'工程師',seniority:3,note:''},
-  {id:'K17184',name:'林農程',shift:'4B',group:'C2',title:'技術員',seniority:4,note:''},
-  {id:'K22505',name:'潘彥彤',shift:'4B',group:'C2',title:'工程師',seniority:4,note:''},
-  {id:'K26287',name:'吳俊耀',shift:'4B',group:'C2',title:'工程師',seniority:2,note:''},
-  // 4B - C3
-  {id:'D1409',name:'盧昱仁',shift:'4B',group:'C3',title:'資深工程師',seniority:6,note:'C3班長'},
-  {id:'C8849',name:'林郁祥',shift:'4B',group:'C3',title:'工程師',seniority:3,note:''},
-  {id:'K19148',name:'洪柏安',shift:'4B',group:'C3',title:'工程師',seniority:4,note:''},
-  {id:'K22427',name:'蕭仁豪',shift:'4B',group:'C3',title:'工程師',seniority:5,note:''},
-  {id:'K26491',name:'林軒羽',shift:'4B',group:'C3',title:'技術員',seniority:2,note:'教召'},
-  // 5A - Z1
-  {id:'K13985',name:'黃弘儒',shift:'5A',group:'Z1',title:'資深工程師',seniority:7,note:'Z1班長'},
-  {id:'F1350',name:'黃慕生',shift:'5A',group:'Z1',title:'工程師',seniority:5,note:''},
-  {id:'K18791',name:'許鈺瑋',shift:'5A',group:'Z1',title:'工程師',seniority:4,note:''},
-  {id:'K21388',name:'丁聖旻',shift:'5A',group:'Z1',title:'技術員',seniority:3,note:''},
-  // 5A - Z2
-  {id:'K12889',name:'蔡博旭',shift:'5A',group:'Z2',title:'工程師',seniority:5,note:'Z2班長'},
-  {id:'F9144',name:'張誌中',shift:'5A',group:'Z2',title:'工程師',seniority:3,note:''},
-  {id:'K16639',name:'施文旌',shift:'5A',group:'Z2',title:'工程師',seniority:4,note:''},
-  {id:'K21240',name:'成必展',shift:'5A',group:'Z2',title:'技術員',seniority:3,note:''},
-  // 5A - Z3
-  {id:'K19150',name:'楊承冀',shift:'5A',group:'Z3',title:'工程師',seniority:4,note:'Z3班長'},
-  {id:'K14093',name:'崔淵翔',shift:'5A',group:'Z3',title:'工程師',seniority:5,note:''},
-  {id:'F2567',name:'陳榮富',shift:'5A',group:'Z3',title:'資深工程師',seniority:8,note:''},
-  {id:'D2657',name:'張明詩',shift:'5A',group:'Z3',title:'工程師',seniority:4,note:''},
-  {id:'K25578',name:'梁凱葳',shift:'5A',group:'Z3',title:'技術員',seniority:2,note:''},
-  {id:'K26288',name:'林冠何',shift:'5A',group:'Z3',title:'工程師',seniority:3,note:''},
-  // 5B - X1
-  {id:'29711',name:'陳源德',shift:'5B',group:'X1',title:'資深工程師',seniority:8,note:'X1班長'},
-  {id:'G7083',name:'吳和諺',shift:'5B',group:'X1',title:'工程師',seniority:4,note:''},
-  {id:'K03007',name:'洪秦閔',shift:'5B',group:'X1',title:'工程師',seniority:5,note:''},
-  {id:'K21738',name:'蘇柏源',shift:'5B',group:'X1',title:'工程師',seniority:3,note:''},
-  {id:'K25992',name:'賴劭恆',shift:'5B',group:'X1',title:'工程師',seniority:4,note:''},
-  // 5B - X2
-  {id:'K12601',name:'潘御齊',shift:'5B',group:'X2',title:'工程師',seniority:5,note:'X2班長'},
-  {id:'C6708',name:'楊萬豐',shift:'5B',group:'X2',title:'技術員',seniority:3,note:''},
-  {id:'K15682',name:'郭育維',shift:'5B',group:'X2',title:'工程師',seniority:4,note:''},
-  {id:'K25715',name:'洪偉展',shift:'5B',group:'X2',title:'工程師',seniority:4,note:''},
-  // 5B - X3
-  {id:'F9473',name:'江政樺',shift:'5B',group:'X3',title:'工程師',seniority:5,note:'X3班長'},
-  {id:'F8950',name:'黃偉利',shift:'5B',group:'X3',title:'技術員',seniority:2,note:''},
-  {id:'K18750',name:'黃義善',shift:'5B',group:'X3',title:'工程師',seniority:4,note:''},
-  {id:'K21311',name:'鄭元益',shift:'5B',group:'X3',title:'工程師',seniority:3,note:''},
-  {id:'K26490',name:'賴俞達',shift:'5B',group:'X3',title:'工程師',seniority:3,note:''},
 
-  // ─── 保養組（FT01 4000 出勤預排表）─── 排班依保養組.jpg
-  // 4A 保養組
-  {id:'K25091',name:'李建勳',shift:'4A',group:'A1',title:'保養組',seniority:1,note:'保養組'},
-  {id:'K25386',name:'邱泓叡',shift:'4A',group:'A1',title:'保養組',seniority:1,note:'保養組'},
-  {id:'K25130',name:'黃育暉',shift:'4A',group:'A2',title:'保養組',seniority:1,note:'保養組'},
-  {id:'K25090',name:'陳萱菲',shift:'4A',group:'A3',title:'保養組',seniority:1,note:'保養組'},
-  // 4B 保養組
-  {id:'K25131',name:'張宸旋',shift:'4B',group:'C1',title:'保養組',seniority:1,note:'保養組'},
-  {id:'K25089',name:'鄭志庸',shift:'4B',group:'C2',title:'保養組',seniority:1,note:'保養組'},
-  {id:'K25092',name:'鍾宛苓',shift:'4B',group:'C3',title:'保養組',seniority:1,note:'保養組'},
-  {id:'K25132',name:'王靖嘉',shift:'4B',group:'C3',title:'保養組',seniority:1,note:'保養組'},
-];
 
-// ═══════════════════════════════════════════════════════════
-// 保養組 2026 年排班明細 (來自 保養組.jpg)
-// V=ON  休=REST  例=HOLIDAY  橙色=LEAVE
-// M6 為實際 JPG 判讀；M7~M9 依相同模式延伸（用戶可手動微調）
-// ═══════════════════════════════════════════════════════════
-const MAINT_SCHED_M6 = {
-  // ─── 4A 保養組 ───
-  'K25091': {1:'ON',2:'LEAVE',3:'LEAVE',4:'REST',5:'HOLIDAY',6:'LEAVE',7:'LEAVE',8:'ON',9:'ON',10:'REST',11:'LEAVE',12:'HOLIDAY',13:'ON',14:'LEAVE',15:'LEAVE',16:'REST',17:'HOLIDAY',18:'LEAVE',19:'LEAVE',20:'ON',21:'ON',22:'LEAVE',23:'LEAVE',24:'HOLIDAY',25:'ON',26:'LEAVE',27:'LEAVE',28:'REST',29:'HOLIDAY',30:'LEAVE'},
-  'K25386': {1:'ON',2:'LEAVE',3:'LEAVE',4:'REST',5:'HOLIDAY',6:'LEAVE',7:'LEAVE',8:'ON',9:'ON',10:'LEAVE',11:'HOLIDAY',12:'ON',13:'LEAVE',14:'LEAVE',15:'LEAVE',16:'REST',17:'HOLIDAY',18:'LEAVE',19:'LEAVE',20:'ON',21:'ON',22:'LEAVE',23:'LEAVE',24:'HOLIDAY',25:'ON',26:'LEAVE',27:'LEAVE',28:'REST',29:'HOLIDAY',30:'LEAVE'},
-  'K25130': {1:'HOLIDAY',2:'LEAVE',3:'LEAVE',4:'ON',5:'REST',6:'LEAVE',7:'LEAVE',8:'HOLIDAY',9:'ON',10:'LEAVE',11:'LEAVE',12:'ON',13:'REST',14:'LEAVE',15:'LEAVE',16:'LEAVE',17:'HOLIDAY',18:'ON',19:'REST',20:'LEAVE',21:'LEAVE',22:'LEAVE',23:'HOLIDAY',24:'ON',25:'LEAVE',26:'LEAVE',27:'REST',28:'LEAVE',29:'HOLIDAY',30:'ON'},
-  'K25090': {1:'REST',2:'LEAVE',3:'LEAVE',4:'HOLIDAY',5:'ON',6:'LEAVE',7:'LEAVE',8:'LEAVE',9:'REST',10:'HOLIDAY',11:'LEAVE',12:'LEAVE',13:'ON',14:'LEAVE',15:'LEAVE',16:'REST',17:'HOLIDAY',18:'LEAVE',19:'LEAVE',20:'ON',21:'ON',22:'LEAVE',23:'LEAVE',24:'HOLIDAY',25:'LEAVE',26:'ON',27:'LEAVE',28:'LEAVE',29:'HOLIDAY',30:'ON'},
-  // ─── 4B 保養組 ───
-  'K25131': {1:'LEAVE',2:'ON',3:'REST',4:'LEAVE',5:'LEAVE',6:'HOLIDAY',7:'ON',8:'LEAVE',9:'LEAVE',10:'REST',11:'HOLIDAY',12:'LEAVE',13:'LEAVE',14:'ON',15:'REST',16:'LEAVE',17:'LEAVE',18:'HOLIDAY',19:'ON',20:'LEAVE',21:'LEAVE',22:'REST',23:'HOLIDAY',24:'LEAVE',25:'LEAVE',26:'ON',27:'REST',28:'LEAVE',29:'LEAVE',30:'HOLIDAY'},
-  'K25089': {1:'LEAVE',2:'HOLIDAY',3:'ON',4:'LEAVE',5:'LEAVE',6:'REST',7:'HOLIDAY',8:'LEAVE',9:'LEAVE',10:'ON',11:'REST',12:'LEAVE',13:'LEAVE',14:'HOLIDAY',15:'ON',16:'LEAVE',17:'LEAVE',18:'REST',19:'HOLIDAY',20:'LEAVE',21:'LEAVE',22:'ON',23:'REST',24:'LEAVE',25:'LEAVE',26:'HOLIDAY',27:'ON',28:'LEAVE',29:'LEAVE',30:'REST'},
-  'K25092': {1:'LEAVE',2:'LEAVE',3:'REST',4:'HOLIDAY',5:'LEAVE',6:'LEAVE',7:'LEAVE',8:'ON',9:'LEAVE',10:'LEAVE',11:'REST',12:'HOLIDAY',13:'ON',14:'LEAVE',15:'LEAVE',16:'LEAVE',17:'REST',18:'HOLIDAY',19:'ON',20:'LEAVE',21:'LEAVE',22:'LEAVE',23:'REST',24:'HOLIDAY',25:'ON',26:'LEAVE',27:'LEAVE',28:'LEAVE',29:'REST',30:'HOLIDAY'},
-  'K25132': {1:'LEAVE',2:'LEAVE',3:'REST',4:'HOLIDAY',5:'LEAVE',6:'ON',7:'LEAVE',8:'LEAVE',9:'LEAVE',10:'LEAVE',11:'HOLIDAY',12:'ON',13:'LEAVE',14:'LEAVE',15:'LEAVE',16:'REST',17:'HOLIDAY',18:'LEAVE',19:'ON',20:'LEAVE',21:'LEAVE',22:'LEAVE',23:'REST',24:'HOLIDAY',25:'LEAVE',26:'ON',27:'LEAVE',28:'LEAVE',29:'REST',30:'HOLIDAY'}
-};
-
-// 將 6 月的 30 天模式延伸至有不同天數的月份（31 天月補一天 LEAVE）
-function extendMaintToMonth(base30, daysInMonth){
-  const out = {};
-  // 對 1-30 直接複製
-  for(let d=1; d<=30 && d<=daysInMonth; d++){ out[d] = base30[d]; }
-  // 第 31 天：若該月有，補 LEAVE（用戶可手動調整）
-  if(daysInMonth >= 31){ out[31] = 'LEAVE'; }
-  return out;
-}
-
-// 自動產生 M7 / M8 / M9 — 沿用相同模式
-// 7 月 (31 天) / 8 月 (31 天) / 9 月 (30 天)
-const MAINT_SCHED_M7 = {};
-const MAINT_SCHED_M8 = {};
-const MAINT_SCHED_M9 = {};
-Object.keys(MAINT_SCHED_M6).forEach(id => {
-  MAINT_SCHED_M7[id] = extendMaintToMonth(MAINT_SCHED_M6[id], 31);
-  MAINT_SCHED_M8[id] = extendMaintToMonth(MAINT_SCHED_M6[id], 31);
-  MAINT_SCHED_M9[id] = extendMaintToMonth(MAINT_SCHED_M6[id], 30);
-});
-
-// 月份對照表
-const MAINT_SCHED_BY_MONTH = {
-  6: MAINT_SCHED_M6,
-  7: MAINT_SCHED_M7,
-  8: MAINT_SCHED_M8,
-  9: MAINT_SCHED_M9
-};
-
-// 套用保養組排班 — 覆蓋預設的 4A_G1/G2/G3、4B_G1/G2/G3 自動產生結果
-// 保養組人員的 loc 固定設為 'KE'（KEEPER）以視覺區別
-function applyMaintenanceSchedule(){
-  // 只套用到「目前名單中實際存在」的保養組人員（保養組屬 A3；KL/NK 無此名單即跳過）
-  const ids = new Set(engineers.map(e=>e.id));
-  // 對所有有保養組排班資料的月份套用
-  for(const month in MAINT_SCHED_BY_MONTH){
-    const monthMap = MAINT_SCHED_BY_MONTH[month];
-    const mStr = String(month).padStart(2,'0');
-    for(const id in monthMap){
-      if(!ids.has(id)) continue;   // 此廠沒有這位保養組人員 → 不套用
-      if(!scheduleData[id]) scheduleData[id] = {};
-      const dayMap = monthMap[id];
-      for(const d in dayMap){
-        const key = '2026-'+mStr+'-'+String(d).padStart(2,'0');
-        const t = dayMap[d];
-        scheduleData[id][key] = {type:t, loc:'KE', leave:0, ot: t==='LEAVE'?1:0};
-      }
-    }
-  }
-}
-
-// 保養組預設人員清單（用於 schema migration 時補回）
-const MAINT_DEFAULT_PEOPLE = [
-  {id:'K25091',name:'李建勳',shift:'4A',group:'A1',title:'保養組',seniority:1,note:'保養組'},
-  {id:'K25386',name:'邱泓叡',shift:'4A',group:'A1',title:'保養組',seniority:1,note:'保養組'},
-  {id:'K25130',name:'黃育暉',shift:'4A',group:'A2',title:'保養組',seniority:1,note:'保養組'},
-  {id:'K25090',name:'陳萱菲',shift:'4A',group:'A3',title:'保養組',seniority:1,note:'保養組'},
-  {id:'K25131',name:'張宸旋',shift:'4B',group:'C1',title:'保養組',seniority:1,note:'保養組'},
-  {id:'K25089',name:'鄭志庸',shift:'4B',group:'C2',title:'保養組',seniority:1,note:'保養組'},
-  {id:'K25092',name:'鍾宛苓',shift:'4B',group:'C3',title:'保養組',seniority:1,note:'保養組'},
-  {id:'K25132',name:'王靖嘉',shift:'4B',group:'C3',title:'保養組',seniority:1,note:'保養組'}
-];
-
-// Schema migration：載入舊資料後，若保養組人員缺失則補回
-// （v3.2 → v3.3 升級時、或從備份 JSON 還原時都會用到）
-function mergeMaintenanceData(){
-  let added = 0;
-  MAINT_DEFAULT_PEOPLE.forEach(p => {
-    if(!engineers.some(e => e.id === p.id)){
-      engineers.push({...p});
-      added++;
-    }
-  });
-  // 補回對應的排班資料（只補缺的，不覆蓋已有的）
-  for(const month in MAINT_SCHED_BY_MONTH){
-    const monthMap = MAINT_SCHED_BY_MONTH[month];
-    const mStr = String(month).padStart(2,'0');
-    for(const id in monthMap){
-      if(!scheduleData[id]) scheduleData[id] = {};
-      const dayMap = monthMap[id];
-      for(const d in dayMap){
-        const key = '2026-'+mStr+'-'+String(d).padStart(2,'0');
-        if(!scheduleData[id][key]){
-          const t = dayMap[d];
-          scheduleData[id][key] = {type:t, loc:'KE', leave:0, ot: t==='LEAVE'?1:0};
-        }
-      }
-    }
-  }
-  return added;
-}
 
 // (Month stats are now computed dynamically from scheduleData via getMonthStats())
 
@@ -1381,6 +1483,88 @@ function getCalKey(shift, group){
   const gNum = group.slice(-1); // '1','2','3'
   const base = (shift==='4A'||shift==='5A') ? '4A' : '4B';
   return base+'_G'+gNum;
+}
+
+/* ════════════════════════════════════════════════════════
+   班表規律推算引擎（2026/9 起、跨年自動生成用）
+   規則（已用 2026/6~8 公告資料逐日驗證）：
+   1. 做二休二：上 2 天 → 休 2 天，4 天一循環，各組相位錯開
+   2. 休日標籤照 LEAVE → REST → HOLIDAY 三循環（各組相位不同）
+   3. 不允許連續 7 天上班：HOLIDAY（例假，不可出勤）間距 ≤ 7 天，
+      可出勤日（ON/LEAVE/REST）最長連續 6 天 → 推算結果天然合規，
+      仍以 checkSevenDayRule() 做硬性檢核
+   2026 年 6~8 月有公告行事曆（CAL_2026）→ 用實際資料（含人工微調）；
+   其餘月份 → 以 2026/6/1 為錨點推算，Leader / ADMIN 可再微調。
+   ════════════════════════════════════════════════════════ */
+const CAL_ANCHOR_UTC = Date.UTC(2026, 5, 1);          // 2026/6/1
+const OFF_LABEL_CYCLE = ['LEAVE', 'REST', 'HOLIDAY'];
+
+// 由 2026/6 公告資料反推各組相位（啟動時計算一次）
+const CAL_PHASES = (() => {
+  const phases = {};
+  for(const calKey in CAL_2026){
+    const jun = CAL_2026[calKey].M6 || {};
+    const isOff = d => jun[d] !== 'ON';
+    // 工作週期偏移 o：使「(日序+o) mod 4 >= 2 ⇔ 休日」對 6 月 30 天全部成立
+    let o = -1;
+    for(let c = 0; c < 4; c++){
+      let ok = true;
+      for(let d = 1; d <= 30; d++){
+        if((((d - 1 + c) % 4) >= 2) !== isOff(d)){ ok = false; break; }
+      }
+      if(ok){ o = c; break; }
+    }
+    // 標籤相位：取與三循環吻合度最高的相位（公告中的少數人工微調視為例外）
+    const offs = [];
+    for(let d = 1; d <= 30; d++){ if(isOff(d)) offs.push(jun[d]); }
+    let best = 0, bestScore = -1;
+    for(let b = 0; b < 3; b++){
+      let s = 0;
+      offs.forEach((t, i) => { if(t === OFF_LABEL_CYCLE[(b + i) % 3]) s++; });
+      if(s > bestScore){ bestScore = s; best = b; }
+    }
+    phases[calKey] = {o, labelBase: best};
+  }
+  return phases;
+})();
+
+// 推算某組某日的班別（做二休二 + 三循環標籤）
+function predictDayType(calKey, year, month0, day){
+  const ph = CAL_PHASES[calKey];
+  if(!ph || ph.o < 0) return 'ON';
+  const n = Math.round((Date.UTC(year, month0, day) - CAL_ANCHOR_UTC) / 86400000);
+  const a = n + ph.o;
+  const pos = ((a % 4) + 4) % 4;
+  if(pos < 2) return 'ON';                       // 上班日
+  // 第幾個休日（自錨點起算；offCnt(x) = 週期座標 [0..x] 內休日數，支援負數平移）
+  const offCnt = x => {
+    const s = x >= 0 ? 0 : Math.ceil(-x / 4) * 4;   // 平移到非負區間（每 4 天恰 2 休）
+    const t = x + s;
+    return 2 * Math.floor((t + 1) / 4) + Math.max(0, (t + 1) % 4 - 2) - s / 2;
+  };
+  const offIdx = offCnt(a) - offCnt(ph.o - 1) - 1;
+  return OFF_LABEL_CYCLE[(((ph.labelBase + offIdx) % 3) + 3) % 3];
+}
+
+// 統一查班別：2026 有公告月份用公告，其餘用推算（含跨年安全）
+function getDayTypeFor(calKey, year, month0, day){
+  if(year === 2026){
+    const mc = (CAL_2026[calKey] || {})['M' + (month0 + 1)];
+    if(mc && mc[day] !== undefined) return mc[day];
+  }
+  return predictDayType(calKey, year, month0, day);
+}
+
+// 硬性檢核：不可連續 7 天上班。
+// 「上班」= 預設實際出勤日（ON、LEAVE 加班日）；REST / HOLIDAY 皆中斷連續。
+// （推算班表另天然滿足更嚴格性質：僅以例假中斷時最長連續亦只有 6 天）
+function checkSevenDayRule(types){
+  let run = 0;
+  for(const t of types){
+    run = (t === 'HOLIDAY' || t === 'REST') ? 0 : run + 1;
+    if(run >= 7) return false;
+  }
+  return true;
 }
 
 const LOCS_BY_SHIFT={
@@ -1534,56 +1718,144 @@ function switchMonth(m){
   if(idx>=0) switchMonthByIdx(idx);
 }
 
-// Build schedule data for a specific month
-function buildScheduleForMonth(year,month){
-  const mStr=String(month+1).padStart(2,'0');
-  const daysInMonth=new Date(year,month+1,0).getDate();
-  engineers.forEach((eng,ei)=>{
-    if(!scheduleData[eng.id]) scheduleData[eng.id]={};
-    const calKey=getCalKey(eng.shift,eng.group);
-    const locs=LOCS_BY_SHIFT[eng.shift]||['5F'];
-    const mKey='M'+(month+1);
-    const monthCal=(CAL_2026[calKey]||{})[mKey]||{};
-    for(let d=1;d<=daysInMonth;d++){
-      const key=year+'-'+mStr+'-'+String(d).padStart(2,'0');
-      if(scheduleData[eng.id][key]) continue; // don't overwrite existing data
-      const t=monthCal[d]||'ON';
-      const loc=locs[(ei+d)%locs.length];
-      scheduleData[eng.id][key]={type:t,loc,leave:0,ot:t==='LEAVE'?1:0};
+
+function buildScheduleForMonth(year, month){
+  const mStr = String(month + 1).padStart(2, '0');
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+  engineers.forEach((eng, ei) => {
+    if(!isPersonActiveInMonth(eng, year, month)) return;
+
+    if(!scheduleData[eng.id]){
+      scheduleData[eng.id] = {};
+    }
+
+    const isMaint = !!(eng.isMaintenance || eng.title === '保養組');
+    const calKey = getCalKey(eng.shift, eng.group);
+    const locs = LOCS_BY_SHIFT[eng.shift] || ['5F'];
+    const monthTypes = [];
+    let madeNew = 0;
+
+    for(let d = 1; d <= daysInMonth; d++){
+      const key = year + '-' + mStr + '-' + String(d).padStart(2, '0');
+
+      if(scheduleData[eng.id][key]){            // 已有資料（載入或編輯過）→ 不覆蓋
+        monthTypes.push(scheduleData[eng.id][key].type);
+        continue;
+      }
+
+      // 保養組與一般人員同用「roster 班別/組別 + 做二休二引擎」計算，
+      // 僅工作地點區別：保養組固定 KE（KEEPER）
+      const t = getDayTypeFor(calKey, year, month, d);
+      const loc = isMaint ? 'KE' : locs[(ei + d) % locs.length];
+      monthTypes.push(t);
+      madeNew++;
+
+      scheduleData[eng.id][key] = {
+        type: t,
+        loc,
+        leave: 0,
+        ot: t === 'LEAVE' ? 1 : 0
+      };
+    }
+
+    // 七休一硬性檢核（只審核本次有新生成的月份；推算結果應天然合規）
+    if(madeNew > 0 && !checkSevenDayRule(monthTypes)){
+      console.warn('⚠️ 七休一檢核未通過：', eng.id, year + '/' + (month + 1));
     }
   });
-  // 保養組排班覆蓋（2026/6 ~ 9 月）
-  if(year===2026 && month>=5 && month<=8){ applyMaintenanceSchedule(); }
 }
 
 initMonths();
 
-let engineers=[...ENGINEERS.map(e=>({...e}))];
+let engineers=[];   // 正式名單由伺服器載入（月份檔 + data/<site>/roster.json）
 let scheduleData={};
 let deleteIdx=-1;
+function ymFromYearMonth(year, month){
+  return String(year) + String(month + 1).padStart(2, '0');
+}
+
+function ymFromDateKey(dateKey){
+  if(!dateKey || dateKey.length < 7) return '';
+  return dateKey.slice(0, 4) + dateKey.slice(5, 7);
+}
+
+function isPersonActiveInMonth(eng, year, month){
+  if(!eng) return false;
+
+  const ym = ymFromYearMonth(year, month);
+  const inactiveFromYm = String(eng.inactiveFromYm || '').trim();
+
+  if(inactiveFromYm && ym >= inactiveFromYm){
+    return false;
+  }
+
+  return true;
+}
+
+function activeEngineersForMonth(year, month){
+  return engineers.filter(e => isPersonActiveInMonth(e, year, month));
+}
+
+function getCurrentMonthActiveEngineers(){
+  const cur = AVAIL_MONTHS[activeMonthIdx];
+
+  if(!cur){
+    return engineers;
+  }
+
+  return activeEngineersForMonth(cur.year, cur.month);
+}
+
+function removeScheduleFromYm(id, fromYm){
+  if(!id || !fromYm || !scheduleData[id]) return;
+
+  Object.keys(scheduleData[id]).forEach(dateKey => {
+    const ym = ymFromDateKey(dateKey);
+
+    if(ym && ym >= fromYm){
+      delete scheduleData[id][dateKey];
+    }
+  });
+
+  if(Object.keys(scheduleData[id]).length === 0){
+    delete scheduleData[id];
+  }
+}
+
+function fillDeleteMonthOptions(){
+  const sel = document.getElementById('del-from-month');
+  if(!sel) return;
+
+  sel.innerHTML = '';
+
+  const months = [...AVAIL_MONTHS].sort((a, b) =>
+    monthKey(a.year, a.month) - monthKey(b.year, b.month)
+  );
+
+  months.forEach(m => {
+    const ym = ymFromYearMonth(m.year, m.month);
+    const opt = document.createElement('option');
+
+    opt.value = ym;
+    opt.textContent = m.label + (m.archived ? '（歷史）' : '');
+
+    sel.appendChild(opt);
+  });
+
+  const cur = AVAIL_MONTHS[activeMonthIdx] || months[0];
+
+  if(cur){
+    sel.value = ymFromYearMonth(cur.year, cur.month);
+  }
+}
+
 let calYear=2026,calMonth=5;
 
-/* Build schedule from real 2026 calendar data */
+/* 全量重建：清空後對所有可見月份逐月生成（公告月用公告、其餘用推算） */
 function buildSchedule(){
-  scheduleData={};
-  engineers.forEach((eng,ei)=>{
-    scheduleData[eng.id]={};
-    const calKey=getCalKey(eng.shift,eng.group);
-    const locs=LOCS_BY_SHIFT[eng.shift]||['5F'];
-    AVAIL_MONTHS.forEach(({year,month})=>{
-      const mKey='M'+(month+1);
-      const monthCal=(CAL_2026[calKey]||{})[mKey]||{};
-      const daysInMonth=new Date(year,month+1,0).getDate();
-      for(let d=1;d<=daysInMonth;d++){
-        const key=year+'-'+String(month+1).padStart(2,'0')+'-'+String(d).padStart(2,'0');
-        const t=monthCal[d]||'ON';
-        const loc=locs[(ei+d)%locs.length];
-        scheduleData[eng.id][key]={type:t,loc,leave:0,ot:t==='LEAVE'?1:0};
-      }
-    });
-  });
-  // 保養組排班覆蓋（僅 2026/6 月）
-  applyMaintenanceSchedule();
+  scheduleData = {};
+  AVAIL_MONTHS.forEach(({year, month}) => buildScheduleForMonth(year, month));
 }
 buildSchedule();
 // initLoadData() will be called in DOMContentLoaded instead of lsLoad
@@ -1691,36 +1963,220 @@ setInterval(tickClock,1000);tickClock();
 /* ── sidebar ── */
 function toggleSidebar(){document.getElementById('sidebar').classList.toggle('collapsed');}
 
-/* ── navigate ── */
-function navigate(page,btn){
+let _navigatingPage = false;
+
+async function navigate(page, btn){
+  if(_navigatingPage) return;
+
   // ENG 權限阻擋：人員管理 / 系統設定
-  if(!isLeader() && (page==='personnel' || page==='settings')){
-    showToast('⚠️ '+(page==='personnel'?'人員管理':'系統設定')+' 僅 Leader 可預覽','warning');
+  if(!isLeader() && (page === 'personnel' || page === 'settings')){
+    showToast(
+      '⚠️ ' + (page === 'personnel' ? '人員管理' : '系統設定') + ' 僅 Leader 可預覽',
+      'warning'
+    );
     return;
   }
-  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
-  document.getElementById('page-'+page).classList.add('active');
-  document.querySelectorAll('.nav-item-btn').forEach(b=>b.classList.remove('active'));
-  if(btn)btn.classList.add('active');
-  document.getElementById('topbar-page-name').textContent=PAGE_NAMES[page]||page;
-  if(page==='dashboard')buildDashboard();
-  if(page==='schedule')renderSchedule();
-  if(page==='calendar')renderCalendar();
-  if(page==='personnel')renderPersonnel();
-  if(page==='analysis')renderAnalysis();
-  if(page==='settings')renderRoleBindings();
+
+  _navigatingPage = true;
+
+  try{
+    // 1. 先切換頁面顯示
+    document.querySelectorAll('.page').forEach(p => {
+      p.classList.remove('active');
+    });
+
+    const targetPage = document.getElementById('page-' + page);
+    if(targetPage){
+      targetPage.classList.add('active');
+    }
+
+    // 2. sidebar active 樣式
+    document.querySelectorAll('.nav-item-btn').forEach(b => {
+      b.classList.remove('active');
+    });
+
+    if(btn){
+      btn.classList.add('active');
+    }
+
+    // 3. topbar 頁面名稱
+    const topName = document.getElementById('topbar-page-name');
+    if(topName){
+      topName.textContent = PAGE_NAMES[page] || page;
+    }
+
+    // 4. 顯示重新載入狀態
+    const saveInd = document.getElementById('save-indicator');
+    if(saveInd){
+      saveInd.textContent = '重新載入中...';
+      saveInd.style.color = 'var(--warning)';
+    }
+
+    // 5. 每次切換 sidebar 都重新向後端撈目前站台資料
+    let reloadOk = false;
+
+    if(typeof reloadCurrentSiteDataFromServer === 'function'){
+      reloadOk = await reloadCurrentSiteDataFromServer();
+    }else{
+      console.warn('找不到 reloadCurrentSiteDataFromServer()，改用目前記憶體資料渲染');
+    }
+
+    // 6. 依照頁面重新渲染
+    if(page === 'dashboard'){
+      buildDashboard();
+    }
+
+    if(page === 'schedule'){
+      renderSchedule();
+    }
+
+    if(page === 'calendar'){
+      renderCalendar();
+    }
+
+    if(page === 'personnel'){
+      renderPersonnel();
+    }
+
+    if(page === 'analysis'){
+      renderAnalysis();
+    }
+
+    if(page === 'settings'){
+      renderRoleBindings();
+    }
+
+    // 7. 更新狀態
+    if(saveInd){
+      if(reloadOk){
+        saveInd.textContent = '已同步';
+        saveInd.style.color = 'var(--success)';
+      }else{
+        saveInd.textContent = '使用目前資料';
+        saveInd.style.color = 'var(--warning)';
+      }
+    }
+
+  }catch(e){
+    console.error('navigate failed:', e);
+    showToast('切換頁面失敗：' + (e.message || e), 'danger');
+
+  }finally{
+    _navigatingPage = false;
+  }
 }
 
+
 /* ── toast ── */
-function showToast(msg,type='info'){
-  const icons={success:'bi-check-circle-fill',info:'bi-info-circle-fill',danger:'bi-x-circle-fill',warning:'bi-exclamation-triangle-fill'};
-  const labels={success:'成功',info:'提示',danger:'錯誤',warning:'警告'};
-  const c=document.getElementById('toast-container');
-  const el=document.createElement('div');
-  el.className='toast-item toast-'+type;
-  el.innerHTML='<div class="toast-icon"><i class="bi '+icons[type]+'"></i></div><div><div style="font-weight:700;font-size:12px;color:var(--text-muted)">'+labels[type]+'</div><div>'+msg+'</div></div>';
+
+
+function showToast(msg, type = 'info'){
+  // 相容舊寫法：以前有些地方會傳 error，但 CSS / icon 是 danger
+  const typeMap = {
+    success: 'success',
+    info: 'info',
+    danger: 'danger',
+    error: 'danger',
+    warning: 'warning',
+    warn: 'warning'
+  };
+
+  const finalType = typeMap[type] || 'info';
+
+  const icons = {
+    success: 'bi-check-circle-fill',
+    info: 'bi-info-circle-fill',
+    danger: 'bi-x-circle-fill',
+    warning: 'bi-exclamation-triangle-fill'
+  };
+
+  const labels = {
+    success: '成功',
+    info: '提示',
+    danger: '錯誤',
+    warning: '警告'
+  };
+
+  const c = document.getElementById('toast-container');
+
+  if(!c){
+    console.warn('[showToast] 找不到 #toast-container：', msg);
+    return;
+  }
+
+  let safeMsg = '';
+
+  try{
+    if(msg == null){
+      safeMsg = '';
+    }else if(typeof msg === 'object'){
+      safeMsg = JSON.stringify(msg);
+    }else{
+      safeMsg = String(msg);
+    }
+  }catch(e){
+    safeMsg = String(msg || '');
+  }
+
+  // 避免訊息內有 HTML 造成畫面錯亂
+  safeMsg = safeMsg.replace(/[&<>"']/g, m => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;'
+  }[m]));
+
+  const el = document.createElement('div');
+
+  el.className = 'toast-item toast-' + finalType;
+
+  el.innerHTML =
+    '<div class="toast-icon">' +
+      '<i class="bi ' + icons[finalType] + '"></i>' +
+    '</div>' +
+    '<div>' +
+      '<div style="font-weight:700;font-size:12px;color:var(--text-muted)">' +
+        labels[finalType] +
+      '</div>' +
+      '<div>' + safeMsg + '</div>' +
+    '</div>';
+
   c.appendChild(el);
-  setTimeout(()=>el.remove(),3200);
+
+  setTimeout(() => {
+    try{
+      el.remove();
+    }catch(e){}
+  }, 3200);
+}
+
+
+function getCurrentMonthPersonCountText(){
+  const historyCount = Array.isArray(engineers) ? engineers.length : 0;
+
+  let activeCount = historyCount;
+  let monthLabel = '';
+
+  try{
+    const cur = AVAIL_MONTHS[activeMonthIdx];
+
+    if(cur){
+      monthLabel = cur.label || (cur.year + '/' + String(cur.month + 1).padStart(2, '0'));
+
+      if(typeof activeEngineersForMonth === 'function'){
+        activeCount = activeEngineersForMonth(cur.year, cur.month).length;
+      }
+    }
+  }catch(e){
+    activeCount = historyCount;
+  }
+
+  if(monthLabel){
+    return monthLabel + ' 有效 ' + activeCount + ' 人';
+  }
+
+  return activeCount + ' 人';
 }
 
 /* ── 最後修改時間 UI 更新 ── */
@@ -1761,130 +2217,174 @@ const GROUPS_ALL=['A1','A2','A3','Z1','Z2','Z3','C1','C2','C3','X1','X2','X3'];
 const GROUP_SHIFT={'A1':'4A','A2':'4A','A3':'4A','Z1':'5A','Z2':'5A','Z3':'5A','C1':'4B','C2':'4B','C3':'4B','X1':'5B','X2':'5B','X3':'5B'};
 let _charts={};
 
+
 function buildDashboard(){
   refreshLastModifiedUI();
   refreshLockStatus();
-  const todayKey=dStr(todayNow());
 
-  // === 依四個細項班別累計 ON / OT / Leave ===
-  // 早班(DAY) = 4A + 4B；夜班(NIGHT) = 5A + 5B
-  const SHIFTS=['4A','4B','5A','5B'];
-  const stat={
-    on:   {'4A':0,'4B':0,'5A':0,'5B':0},
-    ot:   {'4A':0,'4B':0,'5A':0,'5B':0},
-    leave:{'4A':0,'4B':0,'5A':0,'5B':0}
+  const todayKey = dStr(todayNow());
+  const dashboardEngineers = getCurrentMonthActiveEngineers();
+
+  const SHIFTS = ['4A','4B','5A','5B'];
+
+  const stat = {
+    on:    {'4A':0,'4B':0,'5A':0,'5B':0},
+    ot:    {'4A':0,'4B':0,'5A':0,'5B':0},
+    leave: {'4A':0,'4B':0,'5A':0,'5B':0}
   };
-  const leavePeople=[];
-  engineers.forEach(eng=>{
-    const sh=eng.shift;
-    if(!SHIFTS.includes(sh))return;
-    const s=(scheduleData[eng.id]||{})[todayKey];
-    if(!s)return;
-    if(s.type==='ON'&&!s.leave) stat.on[sh]++;
-    if(s.ot) stat.ot[sh]++;
+
+  const leavePeople = [];
+
+  dashboardEngineers.forEach(eng => {
+    const sh = eng.shift;
+
+    if(!SHIFTS.includes(sh)) return;
+
+    const s = (scheduleData[eng.id] || {})[todayKey];
+
+    if(!s) return;
+
+    if(s.type === 'ON' && !s.leave){
+      stat.on[sh]++;
+    }
+
+    if(s.ot){
+      stat.ot[sh]++;
+    }
+
     if(s.leave){
       stat.leave[sh]++;
-      leavePeople.push({name:eng.name,isTmp:!!s.leaveTemp,shift:sh});
+      leavePeople.push({
+        name: eng.name,
+        isTmp: !!s.leaveTemp,
+        shift: sh
+      });
     }
   });
 
-  // === 早 / 夜班 小計 + 總計 ===
-  const onDay=stat.on['4A']+stat.on['4B'];
-  const onNight=stat.on['5A']+stat.on['5B'];
-  const otDay=stat.ot['4A']+stat.ot['4B'];
-  const otNight=stat.ot['5A']+stat.ot['5B'];
-  const leaveDay=stat.leave['4A']+stat.leave['4B'];
-  const leaveNight=stat.leave['5A']+stat.leave['5B'];
-  const onTotal=onDay+onNight;
-  const otTotal=otDay+otNight;
-  const leaveTotal=leaveDay+leaveNight;
+  const onDay = stat.on['4A'] + stat.on['4B'];
+  const onNight = stat.on['5A'] + stat.on['5B'];
+  const otDay = stat.ot['4A'] + stat.ot['4B'];
+  const otNight = stat.ot['5A'] + stat.ot['5B'];
+  const leaveDay = stat.leave['4A'] + stat.leave['4B'];
+  const leaveNight = stat.leave['5A'] + stat.leave['5B'];
 
-  // === 出席率：只計算「當下班別」===
-  // 07:31~19:30 → 早班；其他 → 夜班
-  const currentShift=getCurrentShiftByTime(); // 'DAY' or 'NIGHT'
-  const useOn   =currentShift==='DAY'?onDay   :onNight;
-  const useOt   =currentShift==='DAY'?otDay   :otNight;
-  const useLeave=currentShift==='DAY'?leaveDay:leaveNight;
-  const denom=useOn+useOt;
-  const numer=Math.max(0,denom-useLeave);
-  const rate=denom>0?Math.round(numer/denom*100)+'%':'—';
+  const onTotal = onDay + onNight;
+  const otTotal = otDay + otNight;
+  const leaveTotal = leaveDay + leaveNight;
 
-  // === 寫入 DOM ===
-  const tag=document.getElementById('stat-attend-shift-tag');
-  if(currentShift==='DAY'){
-    tag.textContent='早班 4A/4B';
-    tag.style.background='rgba(0,212,255,.15)';
-    tag.style.color='#0095b3';
-  } else {
-    tag.textContent='夜班 5A/5B';
-    tag.style.background='rgba(123,94,167,.18)';
-    tag.style.color='#6a4f8c';
+  const currentShift = getCurrentShiftByTime();
+  const useOn = currentShift === 'DAY' ? onDay : onNight;
+  const useOt = currentShift === 'DAY' ? otDay : otNight;
+  const useLeave = currentShift === 'DAY' ? leaveDay : leaveNight;
+
+  const denom = useOn + useOt;
+  const numer = Math.max(0, denom - useLeave);
+  const rate = denom > 0 ? Math.round(numer / denom * 100) + '%' : '—';
+
+  const tag = document.getElementById('stat-attend-shift-tag');
+
+  if(tag){
+    if(currentShift === 'DAY'){
+      tag.textContent = '早班 4A/4B';
+      tag.style.background = 'rgba(0,212,255,.15)';
+      tag.style.color = '#0095b3';
+    }else{
+      tag.textContent = '夜班 5A/5B';
+      tag.style.background = 'rgba(123,94,167,.18)';
+      tag.style.color = '#6a4f8c';
+    }
   }
-  document.getElementById('stat-attend-rate').textContent=rate;
-  document.getElementById('stat-attend-formula').textContent=`${numer} ÷ ${denom}（當班${useOn}+加班${useOt}−請假${useLeave}）`;
 
-  // 總人員數（即時計算，含保養組）
-  const totalEl=document.getElementById('stat-total');
-  if(totalEl) totalEl.textContent=engineers.length;
-  const totalSubEl=document.getElementById('stat-total-sub');
+  const attendRate = document.getElementById('stat-attend-rate');
+  if(attendRate) attendRate.textContent = rate;
+
+  const attendFormula = document.getElementById('stat-attend-formula');
+  if(attendFormula){
+    attendFormula.textContent = `${numer} ÷ ${denom}（當班${useOn}+加班${useOt}−請假${useLeave}）`;
+  }
+
+  const totalEl = document.getElementById('stat-total');
+  if(totalEl){
+    totalEl.textContent = dashboardEngineers.length;
+  }
+
+  const totalSubEl = document.getElementById('stat-total-sub');
   if(totalSubEl){
-    const maintCount=engineers.filter(e=>e.title==='保養組').length;
-    const mainCount=engineers.length-maintCount;
-    totalSubEl.textContent='主班 '+mainCount+' 人 + 保養組 '+maintCount+' 人';
+    const maintCount = dashboardEngineers.filter(e => e.title === '保養組').length;
+    const mainCount = dashboardEngineers.length - maintCount;
+    totalSubEl.textContent = '主班 ' + mainCount + ' 人 + 保養組 ' + maintCount + ' 人';
   }
 
-  // 今日當班
-  document.getElementById('stat-onduty').textContent=onTotal;
-  document.getElementById('stat-onduty-4A').textContent=stat.on['4A'];
-  document.getElementById('stat-onduty-4B').textContent=stat.on['4B'];
-  document.getElementById('stat-onduty-5A').textContent=stat.on['5A'];
-  document.getElementById('stat-onduty-5B').textContent=stat.on['5B'];
-  document.getElementById('stat-onduty-day').textContent=onDay;
-  document.getElementById('stat-onduty-night').textContent=onNight;
+  const statOnduty = document.getElementById('stat-onduty');
+  if(statOnduty) statOnduty.textContent = onTotal;
 
-  // 今日加班
-  document.getElementById('stat-ot').textContent=otTotal;
-  document.getElementById('stat-ot-4A').textContent=stat.ot['4A'];
-  document.getElementById('stat-ot-4B').textContent=stat.ot['4B'];
-  document.getElementById('stat-ot-5A').textContent=stat.ot['5A'];
-  document.getElementById('stat-ot-5B').textContent=stat.ot['5B'];
-  document.getElementById('stat-ot-day').textContent=otDay;
-  document.getElementById('stat-ot-night').textContent=otNight;
+  const setTxt = (id, val) => {
+    const el = document.getElementById(id);
+    if(el) el.textContent = val;
+  };
 
-  // 今日請假
-  document.getElementById('stat-leave').textContent=leaveTotal;
-  document.getElementById('stat-leave-4A').textContent=stat.leave['4A'];
-  document.getElementById('stat-leave-4B').textContent=stat.leave['4B'];
-  document.getElementById('stat-leave-5A').textContent=stat.leave['5A'];
-  document.getElementById('stat-leave-5B').textContent=stat.leave['5B'];
-  document.getElementById('stat-leave-day').textContent=leaveDay;
-  document.getElementById('stat-leave-night').textContent=leaveNight;
+  setTxt('stat-onduty-4A', stat.on['4A']);
+  setTxt('stat-onduty-4B', stat.on['4B']);
+  setTxt('stat-onduty-5A', stat.on['5A']);
+  setTxt('stat-onduty-5B', stat.on['5B']);
+  setTxt('stat-onduty-day', onDay);
+  setTxt('stat-onduty-night', onNight);
 
-  // Leave names list
-  const leaveNamesEl=document.getElementById('stat-leave-names');
+  setTxt('stat-ot', otTotal);
+  setTxt('stat-ot-4A', stat.ot['4A']);
+  setTxt('stat-ot-4B', stat.ot['4B']);
+  setTxt('stat-ot-5A', stat.ot['5A']);
+  setTxt('stat-ot-5B', stat.ot['5B']);
+  setTxt('stat-ot-day', otDay);
+  setTxt('stat-ot-night', otNight);
+
+  setTxt('stat-leave', leaveTotal);
+  setTxt('stat-leave-4A', stat.leave['4A']);
+  setTxt('stat-leave-4B', stat.leave['4B']);
+  setTxt('stat-leave-5A', stat.leave['5A']);
+  setTxt('stat-leave-5B', stat.leave['5B']);
+  setTxt('stat-leave-day', leaveDay);
+  setTxt('stat-leave-night', leaveNight);
+
+  const leaveNamesEl = document.getElementById('stat-leave-names');
+
   if(leaveNamesEl){
-    if(leavePeople.length===0){
-      leaveNamesEl.innerHTML='<span style="color:var(--accent3)">今日無請假</span>';
-    } else {
-      leaveNamesEl.innerHTML=leavePeople.map(p=>{
-        const isDay=p.shift==='4A'||p.shift==='4B';
-        const shiftColor=isDay?'#0095b3':'#6a4f8c';
-        const shiftBg=isDay?'rgba(0,212,255,.15)':'rgba(123,94,167,.18)';
-        return `<span style="display:inline-flex;align-items:center;gap:3px;margin-right:6px"><span style="background:${shiftBg};color:${shiftColor};border-radius:3px;padding:0 4px;font-size:9px;font-weight:700">${p.shift}</span>${p.name}${p.isTmp?'<span style="background:rgba(255,165,2,.2);color:#b37400;border-radius:3px;padding:0 4px;font-size:9px;font-weight:700">臨請</span>':''}</span>`;
+    if(leavePeople.length === 0){
+      leaveNamesEl.innerHTML = '<span style="color:var(--accent3)">今日無請假</span>';
+    }else{
+      leaveNamesEl.innerHTML = leavePeople.map(p => {
+        const isDay = p.shift === '4A' || p.shift === '4B';
+        const shiftColor = isDay ? '#0095b3' : '#6a4f8c';
+        const shiftBg = isDay ? 'rgba(0,212,255,.15)' : 'rgba(123,94,167,.18)';
+
+        return `<span style="display:inline-flex;align-items:center;gap:3px;margin-right:6px">
+          <span style="background:${shiftBg};color:${shiftColor};border-radius:3px;padding:0 4px;font-size:9px;font-weight:700">${p.shift}</span>
+          ${p.name}
+          ${p.isTmp ? '<span style="background:rgba(255,165,2,.2);color:#b37400;border-radius:3px;padding:0 4px;font-size:9px;font-weight:700">臨請</span>' : ''}
+        </span>`;
       }).join('');
     }
   }
 
-  // Pie: shift counts WITH count labels
-  const shiftCounts={'4A':0,'5A':0,'4B':0,'5B':0};
-  engineers.forEach(e=>shiftCounts[e.shift]=(shiftCounts[e.shift]||0)+1);
-  const sc4A=shiftCounts['4A'],sc5A=shiftCounts['5A'],sc4B=shiftCounts['4B'],sc5B=shiftCounts['5B'];
+  const shiftCounts = {'4A':0,'5A':0,'4B':0,'5B':0};
+
+  dashboardEngineers.forEach(e => {
+    shiftCounts[e.shift] = (shiftCounts[e.shift] || 0) + 1;
+  });
+
+  const sc4A = shiftCounts['4A'];
+  const sc5A = shiftCounts['5A'];
+  const sc4B = shiftCounts['4B'];
+  const sc5B = shiftCounts['5B'];
+
   _buildChart('ch-pie','doughnut',{
     labels:[`4A班 (${sc4A}人)`,`5A班 (${sc5A}人)`,`4B班 (${sc4B}人)`,`5B班 (${sc5B}人)`],
     datasets:[{
       data:[sc4A,sc5A,sc4B,sc5B],
       backgroundColor:['rgba(0,212,255,.75)','rgba(0,255,136,.75)','rgba(123,94,167,.75)','rgba(255,165,2,.75)'],
-      borderWidth:2,borderColor:'#fff'
+      borderWidth:2,
+      borderColor:'#fff'
     }]
   },{
     cutout:'58%',
@@ -1894,75 +2394,119 @@ function buildDashboard(){
     }
   });
 
-  // Group bar
-  const gCounts=GROUPS_ALL.map(g=>engineers.filter(e=>e.group===g).length);
-  const gColors=['rgba(0,212,255,.6)','rgba(0,212,255,.6)','rgba(0,212,255,.6)',
+  const gCounts = GROUPS_ALL.map(g =>
+    dashboardEngineers.filter(e => e.group === g).length
+  );
+
+  const gColors = [
+    'rgba(0,212,255,.6)','rgba(0,212,255,.6)','rgba(0,212,255,.6)',
     'rgba(0,255,136,.6)','rgba(0,255,136,.6)','rgba(0,255,136,.6)',
     'rgba(123,94,167,.6)','rgba(123,94,167,.6)','rgba(123,94,167,.6)',
-    'rgba(255,165,2,.6)','rgba(255,165,2,.6)','rgba(255,165,2,.6)'];
+    'rgba(255,165,2,.6)','rgba(255,165,2,.6)','rgba(255,165,2,.6)'
+  ];
+
   _buildChart('ch-bar','bar',{
     labels:GROUPS_ALL,
-    datasets:[{label:'人數',data:gCounts,backgroundColor:gColors,borderRadius:6,borderSkipped:false}]
+    datasets:[{
+      label:'人數',
+      data:gCounts,
+      backgroundColor:gColors,
+      borderRadius:6,
+      borderSkipped:false
+    }]
   },{
-    scales:{x:{grid:{display:false}},y:{min:0,max:8,ticks:{stepSize:2}}},
-    plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>`${ctx.raw} 人`}}}
+    scales:{
+      x:{grid:{display:false}},
+      y:{min:0,max:8,ticks:{stepSize:2}}
+    },
+    plugins:{
+      legend:{display:false},
+      tooltip:{callbacks:{label:ctx=>`${ctx.raw} 人`}}
+    }
   });
 
-  // Shift label row below bar chart
-  const lblRow=document.getElementById('ch-bar-shift-labels');
+  const lblRow = document.getElementById('ch-bar-shift-labels');
+
   if(lblRow){
-    const shiftGroups=[
+    const shiftGroups = [
       {shift:'4A',groups:'A1 A2 A3',color:SHIFT_LABEL_COLORS['4A'],bg:'rgba(0,212,255,.08)'},
       {shift:'5A',groups:'Z1 Z2 Z3',color:SHIFT_LABEL_COLORS['5A'],bg:'rgba(0,255,136,.08)'},
       {shift:'4B',groups:'C1 C2 C3',color:SHIFT_LABEL_COLORS['4B'],bg:'rgba(123,94,167,.08)'},
-      {shift:'5B',groups:'X1 X2 X3',color:SHIFT_LABEL_COLORS['5B'],bg:'rgba(255,165,2,.08)'},
+      {shift:'5B',groups:'X1 X2 X3',color:SHIFT_LABEL_COLORS['5B'],bg:'rgba(255,165,2,.08)'}
     ];
-    lblRow.innerHTML=shiftGroups.map(s=>`
+
+    lblRow.innerHTML = shiftGroups.map(s => `
       <div style="text-align:center;padding:5px 10px;border-radius:6px;background:${s.bg};flex:1;margin:0 4px">
         <div style="font-size:11px;font-weight:700;color:${s.color}">${s.shift}班</div>
         <div style="font-size:9px;color:var(--text-muted);margin-top:1px">${s.groups}</div>
         <div style="font-size:10px;font-weight:700;color:var(--text-dark);margin-top:2px">${shiftCounts[s.shift]}人</div>
-      </div>`).join('');
+      </div>
+    `).join('');
   }
 
-  // OT top10 for active month
-  const sortedOT=[...engineers].map(e=>({name:e.name,ot:getMonthStats(e.id).ot}))
-    .sort((a,b)=>b.ot-a.ot).slice(0,10);
+  const sortedOT = [...dashboardEngineers]
+    .map(e => ({name:e.name, ot:getMonthStats(e.id).ot}))
+    .sort((a,b) => b.ot - a.ot)
+    .slice(0,10);
+
   _buildChart('ch-ot','bar',{
-    labels:sortedOT.map(e=>e.name),
-    datasets:[{label:'OT次數',data:sortedOT.map(e=>e.ot),backgroundColor:'rgba(123,94,167,.65)',borderRadius:6,borderSkipped:false}]
-  },{indexAxis:'y',scales:{x:{min:0,max:10,ticks:{stepSize:2}},y:{grid:{display:false}}},plugins:{legend:{display:false}}});
-
-  // today list — show ON + OT people; fall back to first day of active month
-  const tl=document.getElementById('today-list');
-  tl.innerHTML='';
-  let listKey=todayKey;
-  const anyHasToday=engineers.some(e=>(scheduleData[e.id]||{})[todayKey]);
-  if(!anyHasToday){
-    const {year,month}=AVAIL_MONTHS[activeMonthIdx];
-    listKey=year+'-'+String(month+1).padStart(2,'0')+'-01';
-  }
-  const activeEngineers=engineers.filter(e=>{
-    const s=(scheduleData[e.id]||{})[listKey];
-    return s&&((s.type==='ON'&&!s.leave)||s.ot);
+    labels:sortedOT.map(e => e.name),
+    datasets:[{
+      label:'OT次數',
+      data:sortedOT.map(e => e.ot),
+      backgroundColor:'rgba(123,94,167,.65)',
+      borderRadius:6,
+      borderSkipped:false
+    }]
+  },{
+    indexAxis:'y',
+    scales:{
+      x:{min:0,max:10,ticks:{stepSize:2}},
+      y:{grid:{display:false}}
+    },
+    plugins:{legend:{display:false}}
   });
-  if(activeEngineers.length===0){
-    tl.innerHTML='<div style="padding:20px;text-align:center;color:var(--text-muted);font-size:13px">當日無出勤記錄</div>';
-  } else {
-    activeEngineers.forEach(e=>{
-      const s=(scheduleData[e.id]||{})[listKey];
-      const isOt=!!s.ot;
-      const otBadge=isOt?`<span style="background:rgba(123,94,167,.2);color:#6a4f8c;border-radius:4px;padding:1px 6px;font-size:10px;font-weight:700;margin-right:4px">OT</span>`:'';
-      tl.innerHTML+=`<div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--border)">
-        <div class="tbl-avatar-placeholder" style="${isOt?'background:linear-gradient(135deg,var(--accent2),#9b59b6)':''}">${e.name[0]}</div>
-        <div style="flex:1">
-          <div style="font-size:13px;font-weight:600">${e.name} ${otBadge}</div>
-          <div style="font-size:11px;color:var(--text-muted)">${e.id} · ${e.shift}/${e.group}</div>
-        </div>
-        <span class="badge-shift shift-${e.shift}" style="font-size:10px">${e.shift}</span>
-        <span style="font-size:11px;color:var(--text-muted)">${s?s.loc:''}</span>
-      </div>`;
+
+  const tl = document.getElementById('today-list');
+
+  if(tl){
+    tl.innerHTML = '';
+
+    let listKey = todayKey;
+
+    const anyHasToday = dashboardEngineers.some(e => (scheduleData[e.id] || {})[todayKey]);
+
+    if(!anyHasToday){
+      const {year, month} = AVAIL_MONTHS[activeMonthIdx];
+      listKey = year + '-' + String(month + 1).padStart(2, '0') + '-01';
+    }
+
+    const activeList = dashboardEngineers.filter(e => {
+      const s = (scheduleData[e.id] || {})[listKey];
+      return s && ((s.type === 'ON' && !s.leave) || s.ot);
     });
+
+    if(activeList.length === 0){
+      tl.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-muted);font-size:13px">當日無出勤記錄</div>';
+    }else{
+      activeList.forEach(e => {
+        const s = (scheduleData[e.id] || {})[listKey];
+        const isOt = !!s.ot;
+        const otBadge = isOt
+          ? `<span style="background:rgba(123,94,167,.2);color:#6a4f8c;border-radius:4px;padding:1px 6px;font-size:10px;font-weight:700;margin-right:4px">OT</span>`
+          : '';
+
+        tl.innerHTML += `<div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--border)">
+          <div class="tbl-avatar-placeholder" style="${isOt ? 'background:linear-gradient(135deg,var(--accent2),#9b59b6)' : ''}">${e.name[0]}</div>
+          <div style="flex:1">
+            <div style="font-size:13px;font-weight:600">${e.name} ${otBadge}</div>
+            <div style="font-size:11px;color:var(--text-muted)">${e.id} · ${e.shift}/${e.group}</div>
+          </div>
+          <span class="badge-shift shift-${e.shift}" style="font-size:10px">${e.shift}</span>
+          <span style="font-size:11px;color:var(--text-muted)">${s ? s.loc : ''}</span>
+        </div>`;
+      });
+    }
   }
 }
 
@@ -2097,53 +2641,80 @@ function openDashRoster(filterType){
   document.getElementById('rosterModal').style.display='flex';
 }
 
+
 function renderSchedule(){
-  const fS=document.getElementById('sch-filter-shift').value;
-  const fG=document.getElementById('sch-filter-group').value;
-  const filtered=engineers.filter(e=>{
-    if(fS==='__MAINT__') return e.title==='保養組' && (!fG||e.group===fG);
-    return (!fS||e.shift===fS)&&(!fG||e.group===fG);
+  const fS = document.getElementById('sch-filter-shift').value;
+  const fG = document.getElementById('sch-filter-group').value;
+
+  const {year, month} = AVAIL_MONTHS[activeMonthIdx];
+  const baseEngineers = activeEngineersForMonth(year, month);
+
+  const filtered = baseEngineers.filter(e => {
+    if(fS === '__MAINT__'){
+      return e.title === '保養組' && (!fG || e.group === fG);
+    }
+
+    return (!fS || e.shift === fS) && (!fG || e.group === fG);
   });
-  const tbl=document.getElementById('sch-table');
-  const {year,month}=AVAIL_MONTHS[activeMonthIdx];
-  const daysInMonth=new Date(year,month+1,0).getDate();
-  const mStr=String(month+1).padStart(2,'0');
 
-  // header - sticky with solid background
-  let hdr='<thead><tr><th style="min-width:88px;position:sticky;left:0;background:#edf0f7;z-index:12;text-align:center">工號</th><th style="min-width:76px;position:sticky;left:88px;background:#edf0f7;z-index:12;text-align:center">姓名</th><th style="background:#edf0f7;z-index:11">班/組</th>';
-  for(let d=1;d<=daysInMonth;d++){
-    const dow=new Date(year,month,d).getDay();
-    const isHol=(dow===0||dow===6);
-    hdr+=`<th style="background:#edf0f7;${isHol?'color:var(--danger)':''}">${d}<br><span style="font-size:9px">${DAY_ZH[dow]}</span></th>`;
+  const tbl = document.getElementById('sch-table');
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const mStr = String(month + 1).padStart(2, '0');
+
+  let hdr = '<thead><tr><th style="min-width:88px;position:sticky;left:0;background:#edf0f7;z-index:12;text-align:center">工號</th><th style="min-width:76px;position:sticky;left:88px;background:#edf0f7;z-index:12;text-align:center">姓名</th><th style="background:#edf0f7;z-index:11">班/組</th>';
+
+  for(let d = 1; d <= daysInMonth; d++){
+    const dow = new Date(year, month, d).getDay();
+    const isHol = (dow === 0 || dow === 6);
+
+    hdr += `<th style="background:#edf0f7;${isHol ? 'color:var(--danger)' : ''}">${d}<br><span style="font-size:9px">${DAY_ZH[dow]}</span></th>`;
   }
-  hdr+='<th style="background:#edf0f7">加班</th><th style="background:#edf0f7">當班</th><th style="background:#edf0f7">總計</th><th style="background:#edf0f7">操作</th></tr></thead>';
 
-  // body
-  let bdy='<tbody>';
-  filtered.forEach(eng=>{
-    const st=getMonthStats(eng.id);
-    bdy+=`<tr><td style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:600;position:sticky;left:0;background:#fff;z-index:1;text-align:center;color:#1a5276">${eng.id}</td>
-    <td style="position:sticky;left:88px;background:#fff;z-index:1;text-align:center"><div class="sch-name" style="font-size:13px">${eng.name}</div></td>
-    <td style="white-space:nowrap"><span class="badge-shift shift-${eng.shift}" style="font-size:10px">${eng.shift}</span><br><span class="badge-group" style="${grpStyle(eng.group)};margin-top:2px">${eng.group}</span></td>`;
-    for(let d=1;d<=daysInMonth;d++){
-      const key=year+'-'+mStr+'-'+String(d).padStart(2,'0');
-      const s=(scheduleData[eng.id]||{})[key]||{type:'ON',loc:'5F',ot:0,leave:0};
-      const lv=(s.leave&&s.leaveTemp)?`<span class="day-leave-tag" style="color:#b37400">臨</span>`:(s.leave?`<span class="day-leave-tag" style="color:#0095b3">假</span>`:'');
-      const locColor=getLocColor(s.loc);
-      const locBg=getLocBg(s.loc);
-      bdy+=`<td class="day-${s.type} day-cell" title="點擊編輯" onclick="openDayEdit('${eng.id}','${key}')" style="cursor:pointer">
+  hdr += '<th style="background:#edf0f7">加班</th><th style="background:#edf0f7">當班</th><th style="background:#edf0f7">總計</th><th style="background:#edf0f7">操作</th></tr></thead>';
+
+  let bdy = '<tbody>';
+
+  filtered.forEach(eng => {
+    const st = getMonthStats(eng.id);
+
+    bdy += `<tr>
+      <td style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:600;position:sticky;left:0;background:#fff;z-index:1;text-align:center;color:#1a5276">${eng.id}</td>
+      <td style="position:sticky;left:88px;background:#fff;z-index:1;text-align:center"><div class="sch-name" style="font-size:13px">${eng.name}</div></td>
+      <td style="white-space:nowrap"><span class="badge-shift shift-${eng.shift}" style="font-size:10px">${eng.shift}</span><br><span class="badge-group" style="${grpStyle(eng.group)};margin-top:2px">${eng.group}</span></td>
+    `;
+
+    for(let d = 1; d <= daysInMonth; d++){
+      const key = year + '-' + mStr + '-' + String(d).padStart(2, '0');
+      const s = (scheduleData[eng.id] || {})[key] || {type:'ON', loc:'5F', ot:0, leave:0};
+
+      const lv = (s.leave && s.leaveTemp)
+        ? `<span class="day-leave-tag" style="color:#b37400">臨</span>`
+        : (s.leave ? `<span class="day-leave-tag" style="color:#0095b3">假</span>` : '');
+
+      const locColor = getLocColor(s.loc);
+      const locBg = getLocBg(s.loc);
+
+      bdy += `<td class="day-${s.type} day-cell" title="點擊編輯" onclick="openDayEdit('${eng.id}','${key}')" style="cursor:pointer">
         <span class="day-type-label ${TYPE_CHIP[s.type]}">${TYPE_LABEL[s.type]}</span>
         ${lv}
         <div class="day-loc" style="color:${locColor};background:${locBg};border-radius:3px;padding:0 3px;display:inline-block">${s.loc}</div>
       </td>`;
     }
-    bdy+=`<td style="text-align:center;font-weight:700;color:var(--accent2)">${st.ot}</td>
-    <td style="text-align:center;font-weight:700;color:#00c570">${st.on}</td>
-    <td style="text-align:center;font-weight:700">${st.total}</td>
-    <td><div class="leader-only" style="display:inline-block"><button class="btn-icon btn-edit" onclick="editScheduleRow('${eng.id}')"><i class="bi bi-pencil-fill"></i></button></div>${isLeader()?'':'<span style="font-size:10px;color:var(--text-muted);font-style:italic">唯讀</span>'}</td></tr>`;
+
+    bdy += `<td style="text-align:center;font-weight:700;color:var(--accent2)">${st.ot}</td>
+      <td style="text-align:center;font-weight:700;color:#00c570">${st.on}</td>
+      <td style="text-align:center;font-weight:700">${st.total}</td>
+      <td>
+        <div class="leader-only" style="display:inline-block">
+          <button class="btn-icon btn-edit" onclick="editScheduleRow('${eng.id}')"><i class="bi bi-pencil-fill"></i></button>
+        </div>
+        ${isLeader() ? '' : '<span style="font-size:10px;color:var(--text-muted);font-style:italic">唯讀</span>'}
+      </td>
+    </tr>`;
   });
-  bdy+='</tbody>';
-  tbl.innerHTML=hdr+bdy;
+
+  bdy += '</tbody>';
+  tbl.innerHTML = hdr + bdy;
 }
 
 /* ════════════════════════════════════════════════════════
@@ -2471,39 +3042,53 @@ function calNext(){calMonth++;if(calMonth>11){calMonth=0;calYear++;}renderCalend
 
 
 /* ── PERSONNEL ── */
+
+
 function renderPersonnel(){
-  const fS=document.getElementById('per-filter-shift').value;
-  const fG=document.getElementById('per-filter-group').value;
-  const q=(document.getElementById('per-search').value||'').toLowerCase();
-  const filtered=engineers.filter(e=>{
-    const matchTxt = !q||e.name.includes(q)||e.id.toLowerCase().includes(q);
-    if(fS==='__MAINT__') return e.title==='保養組' && (!fG||e.group===fG) && matchTxt;
-    return (!fS||e.shift===fS)&&(!fG||e.group===fG)&&matchTxt;
+  const fS = document.getElementById('per-filter-shift').value;
+  const fG = document.getElementById('per-filter-group').value;
+  const q = (document.getElementById('per-search').value || '').toLowerCase();
+
+  const {year, month} = AVAIL_MONTHS[activeMonthIdx];
+  const baseEngineers = activeEngineersForMonth(year, month);
+
+  const filtered = baseEngineers.filter(e => {
+    const matchTxt = !q || e.name.includes(q) || e.id.toLowerCase().includes(q);
+
+    if(fS === '__MAINT__'){
+      return e.title === '保養組' && (!fG || e.group === fG) && matchTxt;
+    }
+
+    return (!fS || e.shift === fS) && (!fG || e.group === fG) && matchTxt;
   });
-  document.getElementById('eng-count').textContent=filtered.length;
-  const tb=document.getElementById('per-tbody');
-  const lbl=AVAIL_MONTHS[activeMonthIdx].label;
-  // Extract month label (e.g. "2026年6月" -> "六月")
-  const monthNum=AVAIL_MONTHS[activeMonthIdx].month+1;
-  const monthZh=['一','二','三','四','五','六','七','八','九','十','十一','十二'][monthNum-1];
-  // Update dynamic headers
-  const thOT=document.getElementById('per-th-ot');
-  const thON=document.getElementById('per-th-on');
-  if(thOT)thOT.textContent=monthZh+'月加班';
-  if(thON)thON.textContent=monthZh+'月當班';
-  tb.innerHTML='';
-  filtered.forEach(eng=>{
-    const ri=engineers.indexOf(eng);
-    const st=getMonthStats(eng.id);
-    tb.innerHTML+=`<tr>
+
+  document.getElementById('eng-count').textContent = filtered.length;
+
+  const tb = document.getElementById('per-tbody');
+  const monthNum = AVAIL_MONTHS[activeMonthIdx].month + 1;
+  const monthZh = ['一','二','三','四','五','六','七','八','九','十','十一','十二'][monthNum - 1];
+
+  const thOT = document.getElementById('per-th-ot');
+  const thON = document.getElementById('per-th-on');
+
+  if(thOT) thOT.textContent = monthZh + '月加班';
+  if(thON) thON.textContent = monthZh + '月當班';
+
+  tb.innerHTML = '';
+
+  filtered.forEach(eng => {
+    const ri = engineers.indexOf(eng);
+    const st = getMonthStats(eng.id);
+
+    tb.innerHTML += `<tr>
       <td><span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent)">${eng.id}</span></td>
       <td><div class="name-cell"><div class="tbl-avatar-placeholder">${eng.name[0]}</div><strong>${eng.name}</strong></div></td>
       <td><span class="badge-shift shift-${eng.shift}">${eng.shift}</span></td>
       <td><span class="badge-group" style="${grpStyle(eng.group)}">${eng.group}</span></td>
       <td style="font-size:12px">${eng.title}</td>
-      <td style="font-size:12px">${eng.hiredate?`<div>${eng.hiredate}</div><div style="color:var(--accent);font-size:11px">${calcSeniorityFromDate(eng.hiredate)}</div>`:eng.seniority+'年'}</td>
-      <td style="font-size:11px"><span class="badge-group" style="background:rgba(0,212,255,.12);color:#0095b3;border:1px solid rgba(0,212,255,.3)">${siteName(eng.factory||currentSite)}</span></td>
-      <td style="font-size:11px;color:var(--text-muted)">${eng.note||'—'}</td>
+      <td style="font-size:12px">${eng.hiredate ? `<div>${eng.hiredate}</div><div style="color:var(--accent);font-size:11px">${calcSeniorityFromDate(eng.hiredate)}</div>` : eng.seniority + '年'}</td>
+      <td style="font-size:11px"><span class="badge-group" style="background:rgba(0,212,255,.12);color:#0095b3;border:1px solid rgba(0,212,255,.3)">${siteName(eng.factory || currentSite)}</span></td>
+      <td style="font-size:11px;color:var(--text-muted)">${eng.note || '—'}</td>
       <td style="text-align:center;font-weight:700;color:var(--accent2)">${st.ot}</td>
       <td style="text-align:center;font-weight:700;color:#00c570">${st.on}</td>
       <td style="text-align:center;font-weight:700">${st.total}</td>
@@ -2512,119 +3097,244 @@ function renderPersonnel(){
           <button class="btn-icon btn-edit" onclick="editPerson(${ri})"><i class="bi bi-pencil-fill"></i></button>
           <button class="btn-icon btn-del" onclick="confirmDelete(${ri})"><i class="bi bi-trash3-fill"></i></button>
         </div>
-        ${isLeader()?'':'<span style="font-size:10px;color:var(--text-muted);font-style:italic">唯讀</span>'}
+        ${isLeader() ? '' : '<span style="font-size:10px;color:var(--text-muted);font-style:italic">唯讀</span>'}
       </td>
     </tr>`;
   });
 }
 
-/* ── ANALYSIS ── */
+
 function renderAnalysis(){
-  const n=engineers.length;
-  const totalEl=document.getElementById('an-total');
-  if(totalEl) totalEl.textContent=n;
-  if(n===0){
-    document.getElementById('an-avg-on').textContent='—';
-    document.getElementById('an-total-ot').textContent='0';
-    document.getElementById('an-top-ot').textContent='—';
+  const activeList = getCurrentMonthActiveEngineers();
+  const n = activeList.length;
+
+  const totalEl = document.getElementById('an-total');
+
+  if(totalEl){
+    totalEl.textContent = n;
+  }
+
+  if(n === 0){
+    document.getElementById('an-avg-on').textContent = '—';
+    document.getElementById('an-total-ot').textContent = '0';
+    document.getElementById('an-top-ot').textContent = '—';
+
+    const sl = document.getElementById('an-shift-list');
+    if(sl) sl.innerHTML = '<div style="color:var(--text-muted);font-size:13px">目前月份無有效人員</div>';
+
+    const gl = document.getElementById('an-group-list');
+    if(gl) gl.innerHTML = '<div style="color:var(--text-muted);font-size:13px">目前月份無有效人員</div>';
+
+    const rl = document.getElementById('an-rank-list');
+    if(rl) rl.innerHTML = '<div style="color:var(--text-muted);font-size:13px;padding:12px">目前月份無排行資料</div>';
+
+    _buildChart('ch-analysis','bar',{
+      labels:['4A班','5A班','4B班','5B班'],
+      datasets:[
+        {
+          label:'當班天數',
+          data:[0,0,0,0],
+          backgroundColor:['rgba(0,212,255,.5)','rgba(0,255,136,.5)','rgba(123,94,167,.5)','rgba(255,165,2,.5)'],
+          borderRadius:4,
+          borderSkipped:false
+        },
+        {
+          label:'加班天數',
+          data:[0,0,0,0],
+          backgroundColor:['rgba(0,212,255,.9)','rgba(0,255,136,.9)','rgba(123,94,167,.9)','rgba(255,165,2,.9)'],
+          borderRadius:4,
+          borderSkipped:false
+        }
+      ]
+    },{
+      scales:{
+        x:{grid:{display:false}},
+        y:{min:0}
+      }
+    });
+
     return;
   }
-  const totalOT=engineers.reduce((a,e)=>a+getMonthStats(e.id).ot,0);
-  const avgOn=(engineers.reduce((a,e)=>a+getMonthStats(e.id).on,0)/n).toFixed(1);
-  const topOT=[...engineers].sort((a,b)=>getMonthStats(b.id).ot-getMonthStats(a.id).ot)[0];
-  document.getElementById('an-avg-on').textContent=avgOn;
-  document.getElementById('an-total-ot').textContent=totalOT;
-  document.getElementById('an-top-ot').textContent=topOT?topOT.name:'—';
 
-  const shifts=['4A','5A','4B','5B'];
-  const shiftCols=['rgba(0,212,255,.7)','rgba(0,255,136,.7)','rgba(123,94,167,.7)','rgba(255,165,2,.7)'];
-  const sl=document.getElementById('an-shift-list');
-  sl.innerHTML='';
-  const maxSC=Math.max(...shifts.map(s=>engineers.filter(e=>e.shift===s).length));
-  // 4 個班別同列顯示（4A / 5A / 4B / 5B）
-  let shiftHtml='<div style="display:flex;gap:10px;flex-wrap:nowrap;align-items:stretch">';
-  shifts.forEach((s,i)=>{
-    const cnt=engineers.filter(e=>e.shift===s).length;
-    const pct=Math.round(cnt/maxSC*100);
-    const accent=shiftCols[i].replace('.7','.9');
-    shiftHtml+=`<div style="flex:1;min-width:0">
-        <div style="display:flex;justify-content:space-between;align-items:baseline;font-size:12px;margin-bottom:6px;gap:4px">
-          <span style="font-weight:600;white-space:nowrap;color:${accent}">${s}班</span>
-          <span style="font-family:'JetBrains Mono',monospace;font-weight:700;color:${accent};white-space:nowrap">${cnt}<span style="font-size:10px;color:var(--text-muted);font-weight:500;margin-left:2px">人</span></span>
-        </div>
-        <div class="prop-bar"><div class="prop-fill" style="width:${pct}%;background:${shiftCols[i]}"></div></div>
-      </div>`;
-  });
-  shiftHtml+='</div>';
-  sl.innerHTML=shiftHtml;
+  const totalOT = activeList.reduce((a, e) => a + getMonthStats(e.id).ot, 0);
+  const avgOn = (activeList.reduce((a, e) => a + getMonthStats(e.id).on, 0) / n).toFixed(1);
+  const topOT = [...activeList].sort((a, b) => getMonthStats(b.id).ot - getMonthStats(a.id).ot)[0];
 
-  const gl=document.getElementById('an-group-list');
-  gl.innerHTML='';
-  const maxGC=Math.max(...GROUPS_ALL.map(g=>engineers.filter(e=>e.group===g).length));
-  GROUPS_ALL.forEach(g=>{
-    const cnt=engineers.filter(e=>e.group===g).length;
-    const pct=Math.round(cnt/maxGC*100);
-    gl.innerHTML+=`<div class="prop-row"><div class="prop-label"><span>${g}（${cnt}人）</span><span style="font-family:'JetBrains Mono',monospace;font-weight:700">${cnt}</span></div><div class="prop-bar"><div class="prop-fill" style="width:${pct}%;background:rgba(0,212,255,.6)"></div></div></div>`;
-  });
+  document.getElementById('an-avg-on').textContent = avgOn;
+  document.getElementById('an-total-ot').textContent = totalOT;
+  document.getElementById('an-top-ot').textContent = topOT ? topOT.name : '—';
 
-  // rank
-  const ranked=[...engineers].sort((a,b)=>getMonthStats(b.id).ot-getMonthStats(a.id).ot).slice(0,8);
-  const rl=document.getElementById('an-rank-list');
-  rl.innerHTML='';
-  ranked.forEach((e,i)=>{
-    const rc=i===0?'rank-1':i===1?'rank-2':i===2?'rank-3':'rank-other';
-    rl.innerHTML+=`<div class="rank-item"><div class="rank-num ${rc}">${i+1}</div><div class="rank-info"><div class="rank-name">${e.name}</div><div class="rank-sub">${e.shift}/${e.group} · ${e.title}</div></div><div class="rank-score">${getMonthStats(e.id).ot}</div></div>`;
+  const shifts = ['4A','5A','4B','5B'];
+  const shiftCols = [
+    'rgba(0,212,255,.7)',
+    'rgba(0,255,136,.7)',
+    'rgba(123,94,167,.7)',
+    'rgba(255,165,2,.7)'
+  ];
+
+  const sl = document.getElementById('an-shift-list');
+  sl.innerHTML = '';
+
+  const maxSC = Math.max(1, ...shifts.map(s => activeList.filter(e => e.shift === s).length));
+
+  let shiftHtml = '<div style="display:flex;gap:10px;flex-wrap:nowrap;align-items:stretch">';
+
+  shifts.forEach((s, i) => {
+    const cnt = activeList.filter(e => e.shift === s).length;
+    const pct = Math.round(cnt / maxSC * 100);
+    const accent = shiftCols[i].replace('.7','.9');
+
+    shiftHtml += `<div style="flex:1;min-width:0">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;font-size:12px;margin-bottom:6px;gap:4px">
+        <span style="font-weight:600;white-space:nowrap;color:${accent}">${s}班</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-weight:700;color:${accent};white-space:nowrap">${cnt}<span style="font-size:10px;color:var(--text-muted);font-weight:500;margin-left:2px">人</span></span>
+      </div>
+      <div class="prop-bar"><div class="prop-fill" style="width:${pct}%;background:${shiftCols[i]}"></div></div>
+    </div>`;
   });
 
-  // analysis chart
-  const shiftOnSum=shifts.map(s=>engineers.filter(e=>e.shift===s).reduce((a,e)=>a+getMonthStats(e.id).on,0));
-  const shiftOTSum=shifts.map(s=>engineers.filter(e=>e.shift===s).reduce((a,e)=>a+getMonthStats(e.id).ot,0));
+  shiftHtml += '</div>';
+  sl.innerHTML = shiftHtml;
+
+  const gl = document.getElementById('an-group-list');
+  gl.innerHTML = '';
+
+  const maxGC = Math.max(1, ...GROUPS_ALL.map(g => activeList.filter(e => e.group === g).length));
+
+  GROUPS_ALL.forEach(g => {
+    const cnt = activeList.filter(e => e.group === g).length;
+    const pct = Math.round(cnt / maxGC * 100);
+
+    gl.innerHTML += `<div class="prop-row">
+      <div class="prop-label">
+        <span>${g}（${cnt}人）</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-weight:700">${cnt}</span>
+      </div>
+      <div class="prop-bar"><div class="prop-fill" style="width:${pct}%;background:rgba(0,212,255,.6)"></div></div>
+    </div>`;
+  });
+
+  const ranked = [...activeList]
+    .sort((a, b) => getMonthStats(b.id).ot - getMonthStats(a.id).ot)
+    .slice(0, 8);
+
+  const rl = document.getElementById('an-rank-list');
+  rl.innerHTML = '';
+
+  ranked.forEach((e, i) => {
+    const rc = i === 0 ? 'rank-1' : i === 1 ? 'rank-2' : i === 2 ? 'rank-3' : 'rank-other';
+
+    rl.innerHTML += `<div class="rank-item">
+      <div class="rank-num ${rc}">${i + 1}</div>
+      <div class="rank-info">
+        <div class="rank-name">${e.name}</div>
+        <div class="rank-sub">${e.shift}/${e.group} · ${e.title}</div>
+      </div>
+      <div class="rank-score">${getMonthStats(e.id).ot}</div>
+    </div>`;
+  });
+
+  const shiftOnSum = shifts.map(s =>
+    activeList.filter(e => e.shift === s).reduce((a, e) => a + getMonthStats(e.id).on, 0)
+  );
+
+  const shiftOTSum = shifts.map(s =>
+    activeList.filter(e => e.shift === s).reduce((a, e) => a + getMonthStats(e.id).ot, 0)
+  );
+
   _buildChart('ch-analysis','bar',{
     labels:['4A班','5A班','4B班','5B班'],
     datasets:[
-      {label:'當班天數',data:shiftOnSum,backgroundColor:shiftCols.map(c=>c.replace('.7','.5')),borderRadius:4,borderSkipped:false},
-      {label:'加班天數',data:shiftOTSum,backgroundColor:shiftCols.map(c=>c.replace('.7','.9')),borderRadius:4,borderSkipped:false}
+      {
+        label:'當班天數',
+        data:shiftOnSum,
+        backgroundColor:shiftCols.map(c => c.replace('.7','.5')),
+        borderRadius:4,
+        borderSkipped:false
+      },
+      {
+        label:'加班天數',
+        data:shiftOTSum,
+        backgroundColor:shiftCols.map(c => c.replace('.7','.9')),
+        borderRadius:4,
+        borderSkipped:false
+      }
     ]
-  },{scales:{x:{grid:{display:false}},y:{min:0}}});
+  },{
+    scales:{
+      x:{grid:{display:false}},
+      y:{min:0}
+    }
+  });
 }
 
-/* ── SCHEDULE MODAL ── */
+
 function openAddSchedule(){
-  document.getElementById('m-sch-idx').value=-1;
-  const sel=document.getElementById('m-sch-person');
-  sel.innerHTML='<option value="">選擇員工</option>';
-  engineers.forEach(e=>{sel.innerHTML+=`<option value="${e.id}">${e.name}（${e.shift}/${e.group}）</option>`;});
-  document.getElementById('m-sch-type').value='ON';
-  document.getElementById('m-sch-leave').value='0';
-  document.getElementById('m-sch-ot').value='0';
-  document.getElementById('m-sch-leave-type').value='0';
-  // Set default date to first day of active month
-  const {year,month}=AVAIL_MONTHS[activeMonthIdx];
-  document.getElementById('m-sch-date').value=year+'-'+String(month+1).padStart(2,'0')+'-01';
+  document.getElementById('m-sch-idx').value = -1;
+
+  const sel = document.getElementById('m-sch-person');
+  sel.innerHTML = '<option value="">選擇員工</option>';
+
+  const {year, month} = AVAIL_MONTHS[activeMonthIdx];
+
+  activeEngineersForMonth(year, month).forEach(e => {
+    sel.innerHTML += `<option value="${e.id}">${e.name}（${e.shift}/${e.group}）</option>`;
+  });
+
+  document.getElementById('m-sch-type').value = 'ON';
+  document.getElementById('m-sch-leave').value = '0';
+  document.getElementById('m-sch-ot').value = '0';
+  document.getElementById('m-sch-leave-type').value = '0';
+
+  document.getElementById('m-sch-date').value =
+    year + '-' + String(month + 1).padStart(2, '0') + '-01';
+
   onSchLeaveChange();
+
   new bootstrap.Modal(document.getElementById('scheduleModal')).show();
 }
+
+
 function editScheduleRow(id){
   if(!isLeader()){
-    showToast('ENG 為唯讀模式，無法編輯排班','warning');
+    showToast('ENG 為唯讀模式，無法編輯排班', 'warning');
     return;
   }
-  const sel=document.getElementById('m-sch-person');
-  sel.innerHTML='<option value="">選擇員工</option>';
-  engineers.forEach(e=>{sel.innerHTML+=`<option value="${e.id}">${e.name}（${e.shift}/${e.group}）</option>`;});
-  sel.value=id;
-  const {year,month}=AVAIL_MONTHS[activeMonthIdx];
-  const midKey=year+'-'+String(month+1).padStart(2,'0')+'-15';
-  document.getElementById('m-sch-date').value=midKey;
-  const s=(scheduleData[id]||{})[midKey]||{type:'ON',loc:'5F',leave:0,ot:0};
-  document.getElementById('m-sch-type').value=s.type;
-  document.getElementById('m-sch-loc').value=s.loc||'5F';
-  document.getElementById('m-sch-leave').value=s.leave?'1':'0';
-  document.getElementById('m-sch-ot').value=s.ot?'1':'0';
-  document.getElementById('m-sch-leave-type').value=s.leaveTemp?'1':'0';
+
+  const sel = document.getElementById('m-sch-person');
+  sel.innerHTML = '<option value="">選擇員工</option>';
+
+  const {year, month} = AVAIL_MONTHS[activeMonthIdx];
+
+  activeEngineersForMonth(year, month).forEach(e => {
+    sel.innerHTML += `<option value="${e.id}">${e.name}（${e.shift}/${e.group}）</option>`;
+  });
+
+  sel.value = id;
+
+  const midKey = year + '-' + String(month + 1).padStart(2, '0') + '-15';
+
+  document.getElementById('m-sch-date').value = midKey;
+
+  const s = (scheduleData[id] || {})[midKey] || {
+    type:'ON',
+    loc:'5F',
+    leave:0,
+    ot:0
+  };
+
+  document.getElementById('m-sch-type').value = s.type;
+  document.getElementById('m-sch-loc').value = s.loc || '5F';
+  document.getElementById('m-sch-leave').value = s.leave ? '1' : '0';
+  document.getElementById('m-sch-ot').value = s.ot ? '1' : '0';
+  document.getElementById('m-sch-leave-type').value = s.leaveTemp ? '1' : '0';
+
   onSchLeaveChange();
+
   new bootstrap.Modal(document.getElementById('scheduleModal')).show();
 }
+
+
 function saveSchedule(){
   if(!requireLeader()) return;
   const id=document.getElementById('m-sch-person').value;
@@ -2692,64 +3402,194 @@ function updateGroupSel(){
   const s=document.getElementById('p-shift').value;
   document.getElementById('p-group').innerHTML=(GROUPS_MAP[s]||[]).map(g=>`<option>${g}</option>`).join('');
 }
-function savePerson(){
+async function savePerson(){
   if(!requireLeader()) return;
-  const idx=parseInt(document.getElementById('per-edit-idx').value);
-  const name=document.getElementById('p-name').value.trim();
-  if(!name){showToast('請輸入姓名！','warning');return;}
-  const hiredate=document.getElementById('p-hiredate').value;
-  const obj={
-    id:document.getElementById('p-id').value.trim(),name,
-    shift:document.getElementById('p-shift').value,
-    group:document.getElementById('p-group').value,
-    title:document.getElementById('p-title').value,
-    factory:document.getElementById('p-factory').value||currentSite,
-    hiredate:hiredate,
-    seniority:hiredate?calcSeniorityYears(hiredate):(parseInt(document.getElementById('p-seniority').value)||0),
-    note:document.getElementById('p-note').value
-  };
-  if(idx>=0){
-    engineers[idx]=obj;
-  }else{
-    engineers.push(obj);
-    // 新增人員：為其產生預設排班資料（依班別/組別），避免 Dashboard 統計遺漏
-    try{ if(typeof buildScheduleForMonth==='function'){ AVAIL_MONTHS.forEach(({year,month})=>buildScheduleForMonth(year,month)); } }catch(e){}
+
+  const idx = parseInt(document.getElementById('per-edit-idx').value, 10);
+  const id = document.getElementById('p-id').value.trim();
+  const name = document.getElementById('p-name').value.trim();
+
+  if(!id){
+    showToast('請輸入工號！', 'warning');
+    document.getElementById('p-id')?.focus();
+    return;
   }
+
+  if(!name){
+    showToast('請輸入姓名！', 'warning');
+    document.getElementById('p-name')?.focus();
+    return;
+  }
+
+  const hiredate = document.getElementById('p-hiredate').value;
+  const oldPerson = idx >= 0 ? engineers[idx] : null;
+
+  const obj = {
+    id: id,
+    name: name,
+    shift: document.getElementById('p-shift').value,
+    group: document.getElementById('p-group').value,
+    title: document.getElementById('p-title').value,
+    factory: document.getElementById('p-factory').value || currentSite,
+    hiredate: hiredate,
+    seniority: hiredate
+      ? calcSeniorityYears(hiredate)
+      : (parseInt(document.getElementById('p-seniority').value, 10) || 0),
+    note: document.getElementById('p-note').value,
+    inactiveFromYm: oldPerson ? (oldPerson.inactiveFromYm || '') : ''
+  };
+
+  const duplicateIdx = engineers.findIndex(e =>
+    String(e.id || '').trim().toLowerCase() === id.toLowerCase()
+  );
+
+  if(idx < 0 && duplicateIdx >= 0){
+    showToast('此工號已存在於目前站台值班工程師名冊：' + id, 'warning');
+    return;
+  }
+
+  if(idx >= 0){
+    if(!oldPerson){
+      showToast('找不到要編輯的人員資料', 'error');
+      return;
+    }
+
+    const oldId = String(oldPerson.id || '').trim();
+
+    if(oldId.toLowerCase() !== id.toLowerCase() && duplicateIdx >= 0){
+      showToast('此工號已存在於目前站台值班工程師名冊：' + id, 'warning');
+      return;
+    }
+
+    engineers[idx] = obj;
+    if(!PREVIEW_MODE) syncRosterSave();   // 編輯後同步該站 roster.json
+
+    if(oldId && oldId !== id){
+      if(scheduleData[oldId] && !scheduleData[id]){
+        scheduleData[id] = scheduleData[oldId];
+      }
+
+      delete scheduleData[oldId];
+    }
+
+  }else{
+    // 值班納編：先到後端做工號唯一性檢查（users.json 已存在 → 拒絕），
+    // 通過後由後端同寫 該站 roster.json + users.json（ENG 帳號）
+    if(!PREVIEW_MODE){
+      let resp = null, data = null;
+      try{
+        resp = await fetch(API_URL + '?action=roster_add&site=' + encodeURIComponent(currentSite), {
+          method: 'POST', headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({person: {...obj, isMaintenance: obj.title === '保養組'}})
+        });
+        data = await resp.json().catch(() => null);
+      }catch(e){
+        showToast('無法連線伺服器，人員新增失敗', 'error');
+        return;
+      }
+      if(!resp.ok || !data || !data.success){
+        showToast(data && data.message ? data.message
+                  : '新增失敗：工號已存在或伺服器錯誤', 'warning');
+        return;
+      }
+    }
+
+    engineers.push(obj);
+
+    try{
+      AVAIL_MONTHS.forEach(({year, month}) => buildScheduleForMonth(year, month));
+    }catch(e){
+      console.warn('新增人員後產生預設排班失敗：', e);
+    }
+  }
+
   lsSave();
-  bootstrap.Modal.getInstance(document.getElementById('personModal')).hide();
-  // 重新渲染所有相關視圖（總人員數、Dashboard 統計、出勤分析皆會同步更新）
+
+  const modal = bootstrap.Modal.getInstance(document.getElementById('personModal'));
+  if(modal) modal.hide();
+
   safeRun('renderPersonnel', renderPersonnel);
   safeRun('buildDashboard', buildDashboard);
   safeRun('renderSchedule', renderSchedule);
   safeRun('renderCalendar', renderCalendar);
   safeRun('renderAnalysis', renderAnalysis);
-  showToast(idx>=0?'人員資料已更新！':'人員新增成功！','success');
+
+  showToast(idx >= 0 ? '人員資料已更新！' : '人員新增成功！', 'success');
 }
+
+
 function confirmDelete(i){
   if(!requireLeader()) return;
-  deleteIdx=i;
-  const e=engineers[i];
-  document.getElementById('del-name').textContent=e.name;
-  document.getElementById('del-id').textContent=e.id+' · '+e.shift+'/'+e.group;
+
+  deleteIdx = i;
+
+  const e = engineers[i];
+
+  if(!e){
+    showToast('找不到要移除的人員資料', 'warning');
+    return;
+  }
+
+  document.getElementById('del-name').textContent = e.name;
+  document.getElementById('del-id').textContent = e.id + ' · ' + e.shift + '/' + e.group;
+
+  fillDeleteMonthOptions();
+
   new bootstrap.Modal(document.getElementById('deleteModal')).show();
 }
+
+
 function executeDelete(){
-  if(deleteIdx<0)return;
-  const name=engineers[deleteIdx].name;
-  const id=engineers[deleteIdx].id;
-  engineers.splice(deleteIdx,1);
-  // 連同排班資料一併移除（避免殘留資料拖累統計）
-  if(id && scheduleData[id]) delete scheduleData[id];
-  deleteIdx=-1;
+  if(deleteIdx < 0) return;
+
+  const target = engineers[deleteIdx];
+
+  if(!target){
+    deleteIdx = -1;
+    showToast('找不到要移除的人員資料', 'warning');
+    return;
+  }
+
+  const name = target.name || '';
+  const id = target.id || '';
+
+  const cur = AVAIL_MONTHS[activeMonthIdx];
+  const defaultYm = cur ? ymFromYearMonth(cur.year, cur.month) : '';
+
+  const sel = document.getElementById('del-from-month');
+  const fromYm = sel && sel.value ? sel.value : defaultYm;
+
+  const fromLabel = sel && sel.selectedOptions && sel.selectedOptions[0]
+    ? sel.selectedOptions[0].textContent
+    : fromYm;
+
+  if(!fromYm){
+    showToast('請選擇移除生效月份', 'warning');
+    return;
+  }
+
+  target.inactiveFromYm = fromYm;
+  if(!PREVIEW_MODE) syncRosterSave();   // 移除標記同步寫回該站 roster.json
+
+  removeScheduleFromYm(id, fromYm);
+
+  deleteIdx = -1;
+
   lsSave();
-  bootstrap.Modal.getInstance(document.getElementById('deleteModal')).hide();
-  // 重新渲染所有相關視圖（總人員數、Dashboard 統計、出勤分析皆會同步更新）
+
+  const modal = bootstrap.Modal.getInstance(document.getElementById('deleteModal'));
+  if(modal) modal.hide();
+
   safeRun('renderPersonnel', renderPersonnel);
   safeRun('buildDashboard', buildDashboard);
   safeRun('renderSchedule', renderSchedule);
   safeRun('renderCalendar', renderCalendar);
   safeRun('renderAnalysis', renderAnalysis);
-  showToast('已刪除 '+name,'info');
+
+  showToast(
+    '已從 ' + fromLabel + ' 含往後月份移除：' + name + '；之前月份已保留',
+    'info'
+  );
 }
 
 /* ── SENIORITY HELPERS ── */
@@ -3037,8 +3877,7 @@ function resetDayToCalendar(){
   if(!eng)return;
   const calKey=getCalKey(eng.shift,eng.group);
   const [y,m,d]=dateKey.split('-');
-  const mKey='M'+parseInt(m);
-  const dayType=((CAL_2026[calKey]||{})[mKey]||{})[parseInt(d)]||'ON';
+  const dayType=getDayTypeFor(calKey,parseInt(y),parseInt(m)-1,parseInt(d));
   const locs=LOCS_BY_SHIFT[eng.shift]||['5F'];
   const ei=engineers.indexOf(eng);
   const loc=locs[(ei+parseInt(d))%locs.length];
