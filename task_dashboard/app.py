@@ -2,12 +2,26 @@ import csv, json, os, uuid
 from datetime import datetime
 from flask import Flask, jsonify, request
 from flask_cors import CORS
+from loguru import logger
+
+# ── Loguru 設定：寫入 log/ 資料夾，每日輪替，保留 90 天 ──
+os.makedirs('log', exist_ok=True)
+logger.add(
+    'log/app_{time:YYYY-MM-DD}.log',
+    rotation='00:00',          # 每日 00:00 換新檔
+    retention='90 days',       # 自動清除 90 天前的紀錄
+    encoding='utf-8',
+    format='{time:YYYY-MM-DD HH:mm:ss} | {level:<7} | {message}',
+    enqueue=True,
+)
 
 app = Flask(__name__)
 CORS(app)
 
 CSV_FILE     = 'tasks.csv'
 PROGRESS_DIR = 'progress'
+ADMIN_FILE   = 'admin.json'
+USERS_FILE   = 'users.json'
 CSV_FIELDS   = [
     'id', '日期', '距今', '棟別', '樓層', '站點', '組織類別', '案件分類',
     '提案人', '項目描述', '管理OWNER', '項目Due Date', '項目OWNER',
@@ -15,6 +29,28 @@ CSV_FIELDS   = [
 ]
 
 os.makedirs(PROGRESS_DIR, exist_ok=True)
+
+def load_admin_config():
+    if not os.path.exists(ADMIN_FILE):
+        return {}
+    with open(ADMIN_FILE, 'r', encoding='utf-8') as f:
+        return json.load(f)
+
+def get_admin_orgs(account):
+    config = load_admin_config()
+    acc = account.upper()
+    return [org for org, accounts in config.items() if acc in accounts]
+
+def get_user_name(account):
+    if not os.path.exists(USERS_FILE):
+        return account.upper()
+    with open(USERS_FILE, 'r', encoding='utf-8') as f:
+        users = json.load(f).get('users', [])
+    acc = account.upper()
+    for u in users:
+        if u.get('account', '').upper() == acc:
+            return u.get('name') or acc
+    return acc
 
 def calc_days_due(date_str):
     if not date_str: return "無"
@@ -94,7 +130,28 @@ def login():
     account  = req.get('account', '').strip()
     password = req.get('password', '').strip()
     print(f"\n{'='*40}\n[登入請求]\n  帳號：{account}\n  密碼：{password}\n  時間：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n{'='*40}\n")
-    return jsonify({"ok": True})
+    logger.info(f"[登入] 帳號={account} 密碼={password}")
+
+    admin_orgs = get_admin_orgs(account)
+    return jsonify({
+        "ok":         True,
+        "account":    account.upper(),
+        "name":       get_user_name(account),
+        "is_admin":   len(admin_orgs) > 0,
+        "admin_orgs": admin_orgs,
+    })
+
+# ── 查詢帳號權限（頁面載入時呼叫）──
+@app.route('/api/whoami/<account>')
+def whoami(account):
+    admin_orgs = get_admin_orgs(account)
+    logger.info(f"[權限查詢] 帳號={account} is_admin={len(admin_orgs)>0} 管轄={admin_orgs}")
+    return jsonify({
+        "account":    account.upper(),
+        "name":       get_user_name(account),
+        "is_admin":   len(admin_orgs) > 0,
+        "admin_orgs": admin_orgs,
+    })
 
 # ── 今日首頁 ──
 @app.route('/api/today_page')
@@ -132,6 +189,7 @@ def add_task():
     new_task['當前最新進度'] = ''
     data.append(new_task)
     save_data(data)
+    logger.info(f"[新增任務] id={new_task['id']} 提案人={new_task['提案人']} 組織={new_task['組織類別']} 描述={new_task['項目描述'][:50]}")
     # 初始進度若有帶
     init_text = req.get('當前最新進度', '').strip()
     if init_text:
@@ -146,6 +204,7 @@ def update_task():
     id_  = req.get('id')
     updatable = ['管理OWNER', '項目Due Date', '項目OWNER', '單項目Due Date',
                '項目描述', '案件分類', '組織類別', '棟別', '樓層', '站點']
+    changed = {f: req[f] for f in updatable if f in req}
     for row in data:
         if row['id'] == id_:
             for field in updatable:
@@ -153,6 +212,7 @@ def update_task():
             row['距今'] = calc_days_due(row.get('項目Due Date', ''))
             break
     save_data(data)
+    logger.info(f"[更新任務] id={id_} 變更欄位={list(changed.keys())} 內容={changed}")
     return jsonify({"status": "ok"})
 
 # ── 新增進度（追加到 JSON）──
@@ -180,6 +240,7 @@ def add_progress(id_):
         parent['children'].append(node)
 
     write_progress(id_, tree)
+    logger.info(f"[新增進度] 任務id={id_} 父節點={parent_id or '頂層'} 內容={text[:80]}")
     return jsonify({"status": "ok", "tree": tree, "node": node})
 
 # ── 刪除 ──
@@ -187,13 +248,16 @@ def add_progress(id_):
 def delete_task():
     data = load_data()
     id_  = request.json.get("id")
+    deleted = next((d for d in data if d["id"] == id_), None)
     data = [d for d in data if d["id"] != id_]
     save_data(data)
     # 同步刪除進度檔
     p = progress_path(id_)
     if os.path.exists(p): os.remove(p)
+    logger.warning(f"[刪除任務] id={id_} 提案人={deleted.get('提案人') if deleted else '?'} 描述={(deleted.get('項目描述','') if deleted else '')[:50]}")
     return jsonify({"status": "ok"})
 
 if __name__ == '__main__':
     load_data()
+    logger.info("[系統啟動] 工作管理系統後端啟動 port=5000")
     app.run(debug=True, port=5000)

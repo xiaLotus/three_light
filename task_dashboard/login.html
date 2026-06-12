@@ -14,20 +14,20 @@
     * { box-sizing:border-box; }
     body {
       font-family:'Noto Sans TC',sans-serif;
-      background:linear-gradient(135deg,#0f172a 0%,#1e1b4b 35%,#312e81 100%);
+      background:linear-gradient(135deg,#c7cfe2 0%,#d7dceb 45%,#bfc8e0 100%);
       background-attachment:fixed; min-height:100vh; margin:0;
       display:flex; align-items:center; justify-content:center;
-      color:#fff; padding:1.5rem;
+      color:#1e293b; padding:1.5rem;
     }
-    .glow { position:fixed; border-radius:50%; filter:blur(90px); pointer-events:none; opacity:.3; }
+    .glow { position:fixed; border-radius:50%; filter:blur(90px); pointer-events:none; opacity:.35; }
     .glow-1 { width:500px; height:500px; background:radial-gradient(circle,#818cf8,transparent); top:-120px; left:-120px; animation:pulse 9s ease-in-out infinite; }
     .glow-2 { width:380px; height:380px; background:radial-gradient(circle,#c084fc,transparent); bottom:-80px; right:-80px; animation:pulse 9s ease-in-out infinite; animation-delay:-4.5s; }
     @keyframes pulse { 0%,100%{transform:scale(1);opacity:.3} 50%{transform:scale(1.12);opacity:.45} }
 
     .login-card {
-      background:rgba(15,23,42,0.75); backdrop-filter:blur(28px);
-      border:1px solid rgba(255,255,255,0.15); border-radius:2rem;
-      box-shadow:0 32px 80px rgba(0,0,0,0.55), 0 0 0 1px rgba(129,140,248,0.12);
+      background:rgba(241,245,250,0.92); backdrop-filter:blur(28px);
+      border:1px solid rgba(99,102,241,0.15); border-radius:2rem;
+      box-shadow:0 24px 64px rgba(99,102,241,0.18), 0 2px 12px rgba(15,23,42,0.06);
       width:100%; max-width:420px; padding:2.75rem 2.5rem;
       position:relative; overflow:hidden;
     }
@@ -46,20 +46,20 @@
       content:''; position:absolute; inset:-1px; border-radius:1.5rem;
       background:linear-gradient(135deg,rgba(255,255,255,0.15),transparent);
     }
-    .field-label { font-size:.72rem; font-weight:700; color:#a5b4fc; letter-spacing:.08em; text-transform:uppercase; margin-bottom:.5rem; display:flex; align-items:center; gap:.4rem; }
+    .field-label { font-size:.72rem; font-weight:700; color:#4f46e5; letter-spacing:.08em; text-transform:uppercase; margin-bottom:.5rem; display:flex; align-items:center; gap:.4rem; }
     .input-wrap { position:relative; }
     .input-icon { position:absolute; left:1rem; top:50%; transform:translateY(-50%); color:rgba(129,140,248,.65); font-size:.9rem; pointer-events:none; }
     .input-icon-right { position:absolute; right:.9rem; top:50%; transform:translateY(-50%); cursor:pointer; color:rgba(156,163,175,.6); font-size:.85rem; transition:color .2s; }
     .input-icon-right:hover { color:#a5b4fc; }
     .ft-input {
-      width:100%; background:rgba(255,255,255,.07); color:#fff;
-      border:1.5px solid rgba(255,255,255,.16); padding:.78rem 2.8rem;
+      width:100%; background:rgba(15,23,42,.03); color:#1e293b;
+      border:1.5px solid rgba(15,23,42,.14); padding:.78rem 2.8rem;
       border-radius:.875rem; font-size:.9rem; font-family:inherit;
       outline:none; transition:all .25s;
     }
-    .ft-input:focus { border-color:rgba(129,140,248,.75); background:rgba(255,255,255,.11); box-shadow:0 0 0 3px rgba(129,140,248,.18); }
+    .ft-input:focus { border-color:rgba(129,140,248,.75); background:#fff; box-shadow:0 0 0 3px rgba(129,140,248,.18); }
     .ft-input.error-border { border-color:rgba(239,68,68,.65); box-shadow:0 0 0 3px rgba(239,68,68,.12); }
-    .ft-input::placeholder { color:rgba(156,163,175,.5); font-size:.85rem; }
+    .ft-input::placeholder { color:#9ca3af; font-size:.85rem; }
     .err-box { background:rgba(239,68,68,.12); border:1px solid rgba(239,68,68,.3); border-radius:.75rem; padding:.6rem .9rem; font-size:.82rem; color:#fca5a5; display:flex; align-items:center; gap:.5rem; margin-bottom:.85rem; }
     .btn-login {
       width:100%; padding:.9rem; border-radius:.9rem; border:none; cursor:pointer;
@@ -73,7 +73,7 @@
     .role-chip { display:inline-flex; align-items:center; gap:.5rem; padding:.4rem .85rem; border-radius:999px; font-size:.78rem; font-weight:600; margin-top:.55rem; }
     .role-admin { background:rgba(6,182,212,.15); border:1px solid rgba(6,182,212,.35); color:#67e8f9; }
     .role-user  { background:rgba(129,140,248,.15); border:1px solid rgba(129,140,248,.35); color:#a5b4fc; }
-    .version { font-size:.68rem; color:rgba(100,116,139,.55); text-align:center; margin-top:1.5rem; }
+    .version { font-size:.68rem; color:#94a3b8; text-align:center; margin-top:1.5rem; }
     @keyframes fadeUp { from{opacity:0;transform:translateY(18px)} to{opacity:1;transform:translateY(0)} }
     .animate-in { animation:fadeUp .45s cubic-bezier(.4,0,.2,1) both; }
     .fade-enter-active,.fade-leave-active { transition:all .2s; }
@@ -92,8 +92,8 @@
         <i class="fas fa-briefcase text-white" style="font-size:2rem;position:relative;z-index:1;"></i>
       </div>
 
-      <h1 class="text-2xl font-bold text-white text-center mb-1 tracking-wide">工作管理系統</h1>
-      <p class="text-gray-400 text-sm text-center mb-7">Work Management System</p>
+      <h1 class="text-2xl font-bold text-center mb-1 tracking-wide" style="color:#1e293b">工作管理系統</h1>
+      <p class="text-sm text-center mb-7" style="color:#64748b">Work Management System</p>
 
       <!-- 錯誤訊息 -->
       <transition name="fade">
@@ -112,15 +112,6 @@
             class="ft-input" :class="{ 'error-border': errField==='account' }"
             placeholder="請輸入帳號" autocomplete="username" ref="accInput">
         </div>
-        <!-- 角色即時預覽 -->
-        <transition name="fade">
-          <div v-if="previewRole !== null" class="role-chip"
-               :class="previewRole ? 'role-admin' : 'role-user'">
-            <i :class="previewRole ? 'fas fa-shield-halved' : 'fas fa-user'"></i>
-            <span v-if="previewRole">管理員 · {{ previewAdminOrgs.join('、') }}</span>
-            <span v-else>一般使用者</span>
-          </div>
-        </transition>
       </div>
 
       <!-- 密碼 -->
@@ -153,22 +144,12 @@
   <script>
     const API = 'http://127.0.0.1:5000'
 
-    const ADMIN_CONFIG = {
-        "FT01營運(硬)": ["F2568", "C9228"],
-        "FT01營運(資)": ["K18251", "F9358"],
-        "FT01營運(保)": ["F2568", "C9228"],
-        "FT01值班":     ["F2568", "C9228"]
-    }
     const STORAGE_KEY  = 'wms_account'
     const getAccount   = () => localStorage.getItem(STORAGE_KEY)
     const setAccount   = a  => localStorage.setItem(STORAGE_KEY, a.toUpperCase())
-    const isAdmin      = a  => a ? Object.values(ADMIN_CONFIG).some(l => l.includes(a.toUpperCase())) : false
-    const getAdminOrgs = a  => a ? Object.entries(ADMIN_CONFIG).filter(([,l])=>l.includes(a.toUpperCase())).map(([o])=>o) : []
 
-    // 已登入直接跳轉
-    ;(function() {
-      if (getAccount()) location.href = 'index.html'
-    })()
+    // 進入登入頁即清除舊登入資訊，必須重新輸入帳密
+    localStorage.removeItem(STORAGE_KEY)
 
     Vue.createApp({
       data() {
@@ -179,8 +160,6 @@
           logging:          false,
           errMsg:           '',
           errField:         '',
-          previewRole:      null,
-          previewAdminOrgs: [],
         }
       },
 
@@ -188,13 +167,6 @@
         onAccountInput() {
           this.errMsg   = ''
           this.errField = ''
-          const acc = this.account.toUpperCase()
-          if (!acc) { this.previewRole = null; return }
-          const adminOrgs = Object.entries(ADMIN_CONFIG)
-            .filter(([, accs]) => accs.includes(acc))
-            .map(([org]) => org)
-          this.previewAdminOrgs = adminOrgs
-          this.previewRole = adminOrgs.length > 0
         },
 
         async doLogin() {

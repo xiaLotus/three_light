@@ -17,20 +17,19 @@
   <style>
     [v-cloak] { display: none !important; }
     * { box-sizing: border-box; }
+    html,body{height:100%;overflow:hidden}
     body {
       font-family: 'Noto Sans TC', sans-serif;
       background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 30%, #312e81 100%);
-      background-attachment: fixed; min-height: 100vh; margin: 0; color: #fff; transition: background 0.4s;
+      background-attachment: fixed;  margin: 0; color: #fff; transition: background 0.4s;
     }
-    body.light {
-      background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 60%, #cbd5e1 100%); color: #1e293b;
-    }
+    body.light { background: linear-gradient(135deg,#c7cfe2 0%,#d7dceb 45%,#bfc8e0 100%); color:#1e293b; }
     .glass-card {
       background: rgba(15,23,42,0.65); backdrop-filter: blur(20px);
       border: 1px solid rgba(255,255,255,0.15); border-radius: 1.5rem;
       box-shadow: 0 8px 32px rgba(0,0,0,0.4); transition: all 0.3s;
     }
-    body.light .glass-card { background: rgba(255,255,255,0.87); border-color: rgba(0,0,0,0.08); box-shadow: 0 4px 24px rgba(0,0,0,0.1); }
+    body.light .glass-card { background:rgba(241,245,250,0.88); border:1px solid rgba(71,85,140,0.14); box-shadow:0 8px 26px rgba(51,65,110,0.12), 0 2px 8px rgba(15,23,42,0.05); }
     body.light .text-white    { color: #1e293b !important; }
     body.light .text-gray-100,
     body.light .text-gray-200,
@@ -141,14 +140,25 @@
     textarea.input-focus{resize:none}
     .field-label{display:flex;align-items:center;gap:.4rem;font-size:.75rem;font-weight:600;letter-spacing:.04em;color:#c4c8f8;margin-bottom:.3rem;text-transform:uppercase}
     body.light .input-focus{background:rgba(0,0,0,.04);color:#1e293b;border-color:rgba(0,0,0,.16)}
+      .fab-btn{opacity:.55;transition:opacity .2s,transform .3s cubic-bezier(.4,0,.2,1)!important}
+    .fab-btn:hover,.fab-btn.fab-open{opacity:1}
+      /* 使用者資訊列亮色修正：青色/靛藍文字調暗 */
+    body.light .text-cyan-200, body.light .text-cyan-300 { color:#0e7490 !important; }
+    body.light .text-indigo-200, body.light .text-indigo-300 { color:#4338ca !important; }
+    body.light .bg-cyan-500\/30 { background:rgba(8,145,178,.16) !important; }
+    body.light .bg-cyan-500\/20 { background:rgba(8,145,178,.10) !important; }
+    body.light .border-cyan-500\/30 { border-color:rgba(8,145,178,.4) !important; }
+    body.light .bg-primary\/30 { background:rgba(79,70,229,.16) !important; }
+    body.light .bg-primary\/20 { background:rgba(79,70,229,.10) !important; }
+    body.light .border-primary\/30 { border-color:rgba(79,70,229,.4) !important; }
   </style>
 </head>
 
-<body class="p-4 md:p-6">
-<div id="app" v-cloak>
+<body class="light">
+<div id="app" v-cloak style="height:100vh;display:flex;flex-direction:column;padding:1rem 1.5rem;box-sizing:border-box;overflow:hidden">
 
   <!-- ── Header ── -->
-  <header class="glass-card p-5 mb-5">
+  <header class="glass-card p-5 mb-4" style="flex-shrink:0">
     <div class="flex flex-col gap-3">
       <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
         <div class="flex items-center gap-4">
@@ -166,6 +176,9 @@
         </div>
         <div class="flex items-center gap-2 flex-wrap">
           <input v-model="keyword" class="search-box" placeholder="🔍 全欄關鍵字搜尋...">
+          <button @click="logout()" class="px-4 py-2 rounded-xl text-sm font-medium text-gray-300 border border-white/20 bg-white/8 hover:bg-red-500/15 hover:text-red-300 hover:border-red-500/30 transition flex items-center gap-2">
+            <i class="fas fa-right-from-bracket"></i>登出
+          </button>
         </div>
       </div>
 
@@ -174,10 +187,10 @@
         <div class="flex items-center gap-2.5">
           <div class="w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold flex-shrink-0"
                :class="isAdmin ? 'bg-cyan-500/30 text-cyan-200' : 'bg-primary/30 text-indigo-200'">
-            {{ account?.[0] }}
+            {{ userName?.[0] }}
           </div>
           <div>
-            <span class="text-white text-sm font-semibold">{{ account }}</span>
+            <span class="text-white text-sm font-semibold">{{ userName }}</span>
             <span class="ml-2 text-xs px-2 py-0.5 rounded-full font-medium"
                   :class="isAdmin ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30' : 'bg-primary/20 text-indigo-300 border border-primary/30'">
               {{ isAdmin ? '管理員' : '一般使用者' }}
@@ -185,16 +198,13 @@
             <span v-if="isAdmin" class="ml-1 text-xs text-gray-400">（{{ adminOrgs.join('、') }}）</span>
           </div>
         </div>
-        <button @click="logout()" class="text-xs text-gray-400 hover:text-red-400 transition flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg hover:bg-red-500/10 border border-transparent hover:border-red-500/20">
-          <i class="fas fa-right-from-bracket"></i>登出
-        </button>
       </div>
 
     </div>
   </header>
 
   <!-- ── 表格 ── -->
-  <div class="glass-card p-0 overflow-hidden">
+  <div class="glass-card p-0 overflow-hidden" style="flex:1;min-height:0;display:flex;flex-direction:column">
     <div v-if="loading" class="p-8 space-y-3">
       <div v-for="i in 6" :key="i" class="h-10 bg-white/10 rounded animate-pulse"></div>
     </div>
@@ -205,7 +215,7 @@
         <i class="fas fa-rotate-left mr-1"></i>重置所有篩選
       </button>
     </div>
-    <div v-else class="overflow-x-auto">
+    <div v-else class="overflow-auto" style="flex:1;min-height:0;padding-bottom:4.5rem">
       <table class="w-full text-sm text-left" style="min-width:1350px;">
         <thead>
           <tr class="text-gray-200 border-b border-white/10 th-head">
@@ -455,13 +465,13 @@
     </transition>
 
     <button @click.stop="showNavMenu = !showNavMenu"
-      class="w-14 h-14 rounded-full shadow-2xl flex items-center justify-center hover:scale-110"
+      class="w-11 h-11 rounded-full shadow-xl flex items-center justify-center hover:scale-110 fab-btn" :class="{'fab-open':showNavMenu}"
       :style="showNavMenu
-        ? 'background:linear-gradient(135deg,#ef4444,#dc2626);box-shadow:0 6px 24px rgba(239,68,68,0.5);transform:rotate(45deg)'
+        ? 'background:linear-gradient(135deg,#ef4444,#dc2626);box-shadow:0 6px 24px rgba(239,68,68,0.5)'
         : 'background:linear-gradient(135deg,#818cf8,#c084fc);box-shadow:0 6px 24px rgba(129,140,248,0.5)'"
       style="transition:all 0.3s cubic-bezier(0.4,0,0.2,1);"
       title="導覽選單">
-      <i class="fas fa-plus text-white text-xl"></i>
+      <i :class="showNavMenu ? 'fas fa-xmark' : 'fas fa-compass'" class="text-white" style="font-size:1.05rem"></i>
     </button>
   </div>
 

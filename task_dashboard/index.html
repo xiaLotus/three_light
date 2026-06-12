@@ -27,8 +27,8 @@
       border: 1px solid rgba(255,255,255,0.15); border-radius: 1.5rem;
       box-shadow: 0 8px 32px rgba(0,0,0,0.4); transition: all 0.3s ease;
     }
-    body.light { background: linear-gradient(135deg,#f1f5f9 0%,#e2e8f0 60%,#cbd5e1 100%); color:#1e293b; }
-    body.light .glass-card { background:rgba(255,255,255,0.85); border:1px solid rgba(0,0,0,0.08); box-shadow:0 4px 24px rgba(0,0,0,0.1); }
+    body.light { background: linear-gradient(135deg,#c7cfe2 0%,#d7dceb 45%,#bfc8e0 100%); color:#1e293b; }
+    body.light .glass-card { background:rgba(241,245,250,0.88); border:1px solid rgba(71,85,140,0.14); box-shadow:0 8px 26px rgba(51,65,110,0.12), 0 2px 8px rgba(15,23,42,0.05); }
     body.light .text-white   { color:#1e293b !important; }
     body.light .text-gray-100,
     body.light .text-gray-200,
@@ -38,7 +38,7 @@
     body.light .bg-white\/10   { background:rgba(0,0,0,0.05) !important; }
     body.light .hover\:bg-white\/10:hover { background:rgba(0,0,0,0.07) !important; }
     body.light .hover\:bg-white\/20:hover { background:rgba(0,0,0,0.1) !important; }
-    body.light .th-sticky  { background:rgba(255,255,255,0.96) !important; }
+    body.light .th-sticky  { background:rgba(236,240,247,0.97) !important; }
     body.light .badge      { background:rgba(99,102,241,0.12); color:#4338ca; border-color:rgba(99,102,241,0.25); }
     body.light .btn-secondary { border-color:rgba(0,0,0,0.18); color:#334155; }
     body.light .btn-secondary:hover { background:rgba(0,0,0,0.06); }
@@ -123,14 +123,25 @@
     .input-focus-m{outline:none;background:rgba(255,255,255,.08);color:#fff;border:1px solid rgba(255,255,255,.2);padding:.55rem .85rem;border-radius:.75rem;transition:all .2s;width:100%;font-size:.875rem;font-family:inherit;resize:none}
     .input-focus-m:focus{border-color:rgba(129,140,248,.7);box-shadow:0 0 0 3px rgba(129,140,248,.18)}
     body.light .input-focus-m{background:rgba(0,0,0,.04);color:#1e293b;border-color:rgba(0,0,0,.16)}
+      .fab-btn{opacity:.55;transition:opacity .2s,transform .3s cubic-bezier(.4,0,.2,1)!important}
+    .fab-btn:hover,.fab-btn.fab-open{opacity:1}
+      /* 使用者資訊列亮色修正：青色/靛藍文字調暗 */
+    body.light .text-cyan-200, body.light .text-cyan-300 { color:#0e7490 !important; }
+    body.light .text-indigo-200, body.light .text-indigo-300 { color:#4338ca !important; }
+    body.light .bg-cyan-500\/30 { background:rgba(8,145,178,.16) !important; }
+    body.light .bg-cyan-500\/20 { background:rgba(8,145,178,.10) !important; }
+    body.light .border-cyan-500\/30 { border-color:rgba(8,145,178,.4) !important; }
+    body.light .bg-primary\/30 { background:rgba(79,70,229,.16) !important; }
+    body.light .bg-primary\/20 { background:rgba(79,70,229,.10) !important; }
+    body.light .border-primary\/30 { border-color:rgba(79,70,229,.4) !important; }
   </style>
 </head>
 
-<body class="p-4 md:p-6">
-<div id="app" v-cloak>
+<body class="light">
+<div id="app" v-cloak style="height:100vh;display:flex;flex-direction:column;padding:1rem 1.5rem;box-sizing:border-box;overflow:hidden">
 
   <!-- ══ Header ══ -->
-  <header class="glass-card p-5 mb-5">
+  <header class="glass-card p-5 mb-4" style="flex-shrink:0">
     <div class="flex flex-col gap-4">
       <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
         <div class="flex items-center gap-4">
@@ -156,6 +167,9 @@
             <button @click="openAddModal" class="btn-primary gap-2 px-4 py-2 text-sm">
               <i class="fas fa-plus"></i>新增任務
             </button>
+            <button @click="logout()" class="px-4 py-2 rounded-xl text-sm font-medium text-gray-300 border border-white/20 bg-white/8 hover:bg-red-500/15 hover:text-red-300 hover:border-red-500/30 transition flex items-center gap-2">
+              <i class="fas fa-right-from-bracket"></i>登出
+            </button>
           </div>
         </div>
       </div>
@@ -165,10 +179,10 @@
         <div class="flex items-center gap-2.5">
           <div class="w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold flex-shrink-0"
                :class="isAdmin ? 'bg-cyan-500/30 text-cyan-200' : 'bg-primary/30 text-indigo-200'">
-            {{ account?.[0] }}
+            {{ userName?.[0] }}
           </div>
           <div>
-            <span class="text-white text-sm font-semibold">{{ account }}</span>
+            <span class="text-white text-sm font-semibold">{{ userName }}</span>
             <span class="ml-2 text-xs px-2 py-0.5 rounded-full font-medium"
                   :class="isAdmin ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30' : 'bg-primary/20 text-indigo-300 border border-primary/30'">
               {{ isAdmin ? '管理員' : '一般使用者' }}
@@ -176,16 +190,13 @@
             <span v-if="isAdmin" class="ml-1 text-xs text-gray-400">（{{ adminOrgs.join('、') }}）</span>
           </div>
         </div>
-        <button @click="logout()" class="text-xs text-gray-400 hover:text-red-400 transition flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg hover:bg-red-500/10 border border-transparent hover:border-red-500/20">
-          <i class="fas fa-right-from-bracket"></i>登出
-        </button>
       </div>
 
     </div>
   </header>
 
   <!-- ══ 統計卡片 ══ -->
-  <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
+  <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4" style="flex-shrink:0">
     <div class="glass-card p-4 text-center">
       <div class="text-2xl font-bold text-primary">{{ todayList.length }}</div>
       <div class="text-gray-300 text-xs mt-1">今日新增</div>
@@ -205,10 +216,10 @@
   </div>
 
   <!-- ══ 主內容雙欄 ══ -->
-  <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-5" style="flex:1;min-height:0">
 
     <!-- 左欄：今日新增 -->
-    <section class="glass-card overflow-hidden flex flex-col" style="max-height:70vh;">
+    <section class="glass-card overflow-hidden flex flex-col" style="min-height:0">
       <div class="section-header flex-shrink-0">
         <div class="section-icon bg-indigo-500/25"><i class="fas fa-calendar-day text-indigo-300"></i></div>
         <div>
@@ -223,7 +234,7 @@
         <i class="fas fa-inbox text-4xl mb-3 opacity-30"></i>
         <p class="text-sm">今日尚無資料</p>
       </div>
-      <div v-else class="overflow-auto flex-1">
+      <div v-else class="overflow-auto flex-1" style="padding-bottom:4.5rem">
         <table class="w-full text-sm" style="min-width:480px;">
           <thead>
             <tr class="text-gray-300 text-xs border-b border-white/10 th-sticky">
@@ -249,7 +260,7 @@
     </section>
 
     <!-- 右欄：逾期 / 今日到期 -->
-    <section class="glass-card overflow-hidden flex flex-col" style="max-height:70vh;">
+    <section class="glass-card overflow-hidden flex flex-col" style="min-height:0">
       <div class="section-header flex-shrink-0">
         <div class="section-icon bg-red-500/20"><i class="fas fa-triangle-exclamation text-red-400"></i></div>
         <div>
@@ -264,7 +275,7 @@
         <i class="fas fa-circle-check text-4xl mb-3 opacity-30 text-green-400"></i>
         <p class="text-sm">目前無逾期任務 🎉</p>
       </div>
-      <div v-else class="overflow-auto flex-1">
+      <div v-else class="overflow-auto flex-1" style="padding-bottom:4.5rem">
         <table class="w-full text-sm" style="min-width:480px;">
           <thead>
             <tr class="text-gray-300 text-xs border-b border-white/10 th-sticky">
@@ -478,13 +489,13 @@
     </transition>
 
     <button @click.stop="showNavMenu = !showNavMenu"
-      class="w-14 h-14 rounded-full shadow-2xl flex items-center justify-center hover:scale-110"
+      class="w-11 h-11 rounded-full shadow-xl flex items-center justify-center hover:scale-110 fab-btn" :class="{'fab-open':showNavMenu}"
       :style="showNavMenu
-        ? 'background:linear-gradient(135deg,#ef4444,#dc2626);box-shadow:0 6px 24px rgba(239,68,68,0.5);transform:rotate(45deg)'
-        : 'background:linear-gradient(135deg,#818cf8,#c084fc);box-shadow:0 6px 24px rgba(129,140,248,0.5)'"
+        ? 'background:linear-gradient(135deg,#ef4444,#dc2626);box-shadow:0 4px 16px rgba(239,68,68,0.5)'
+        : 'background:linear-gradient(135deg,#818cf8,#c084fc);box-shadow:0 4px 16px rgba(129,140,248,0.5)'"
       style="transition:all 0.3s cubic-bezier(0.4,0,0.2,1);"
       title="導覽選單">
-      <i class="fas fa-plus text-white text-xl"></i>
+      <i :class="showNavMenu ? 'fas fa-xmark' : 'fas fa-compass'" class="text-white" style="font-size:1.05rem"></i>
     </button>
   </div>
 

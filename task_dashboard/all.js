@@ -1,19 +1,19 @@
 const API = 'http://127.0.0.1:5000'
 
-// ── 認證（帳號存 localStorage）──
-const ADMIN_CONFIG = {
-    "FT01營運(硬)": ["F2568", "C9228"],
-    "FT01營運(資)": ["K18251", "F9358"],
-    "FT01營運(保)": ["F2568", "C9228"],
-    "FT01值班":     ["F2568", "C9228"]
+// ── 認證（帳號存 localStorage，權限由後台 admin.json 判斷）──
+const STORAGE_KEY = 'wms_account'
+const getAccount  = () => localStorage.getItem(STORAGE_KEY)
+const ftLogout    = () => { localStorage.removeItem(STORAGE_KEY); location.href = 'login.html' }
+const requireAuth = () => { const a = getAccount(); if (!a) { location.href = 'login.html'; return null } return a }
+// 向後台查詢權限：回傳 { account, is_admin, admin_orgs }
+async function fetchRole(account) {
+    try {
+        const res = await axios.get(`${API}/api/whoami/${encodeURIComponent(account)}`)
+        return res.data
+    } catch {
+        return { account: account, is_admin: false, admin_orgs: [] }
+    }
 }
-const STORAGE_KEY  = 'wms_account'
-const getAccount   = () => localStorage.getItem(STORAGE_KEY)
-const isAdmin      = a => a ? Object.values(ADMIN_CONFIG).some(l => l.includes(a.toUpperCase())) : false
-const getAdminOrgs = a => a ? Object.entries(ADMIN_CONFIG).filter(([,l])=>l.includes(a.toUpperCase())).map(([o])=>o) : []
-const ftLogout     = () => { localStorage.removeItem(STORAGE_KEY); location.href = 'login.html' }
-const requireAuth  = () => { const a=getAccount(); if(!a){location.href='login.html';return null} return a }
-const requireAdmin = () => { const a=requireAuth(); if(!a)return null; if(!isAdmin(a)){location.href='index.html';return null} return a }
 
 const app = Vue.createApp({
 
@@ -55,6 +55,7 @@ const app = Vue.createApp({
             toasts:  [],
             toastId: 0,
             account: '',
+            userName: '',
             isAdmin: false,
             adminOrgs: [],
             showNavMenu: false,
@@ -575,9 +576,11 @@ const app = Vue.createApp({
     async mounted() {
         const acc = requireAuth()
         if (!acc) return
-        this.account   = acc
-        this.isAdmin   = isAdmin(acc)
-        this.adminOrgs = getAdminOrgs(acc)
+        this.account = acc
+        const role = await fetchRole(acc)
+        this.userName  = role.name || acc
+        this.isAdmin   = role.is_admin
+        this.adminOrgs = role.admin_orgs
         this.loading = true
         try {
             const res = await axios.get(API + '/api/all')
