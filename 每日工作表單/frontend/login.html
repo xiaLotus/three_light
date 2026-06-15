@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>工作管理系統 — 登入</title>
+  <script src="static/js/package/vue.global.js"></script>
+  <script src="static/js/package/axios.min.js"></script>
+  <script src="static/js/package/tailwinds.js"></script>
+  <link href="static/css/all.min.css" rel="stylesheet">
+  <link href="static/css/css2.css" rel="stylesheet">
+  <style>
+    [v-cloak] { display:none !important; }
+    * { box-sizing:border-box; }
+    body {
+      font-family:'Noto Sans TC',sans-serif;
+      background:linear-gradient(135deg,#c7cfe2 0%,#d7dceb 45%,#bfc8e0 100%);
+      background-attachment:fixed; min-height:100vh; margin:0;
+      display:flex; align-items:center; justify-content:center;
+      color:#1e293b; padding:1.5rem;
+    }
+    .glow { position:fixed; border-radius:50%; filter:blur(90px); pointer-events:none; opacity:.35; }
+    .glow-1 { width:500px; height:500px; background:radial-gradient(circle,#818cf8,transparent); top:-120px; left:-120px; animation:pulse 9s ease-in-out infinite; }
+    .glow-2 { width:380px; height:380px; background:radial-gradient(circle,#c084fc,transparent); bottom:-80px; right:-80px; animation:pulse 9s ease-in-out infinite; animation-delay:-4.5s; }
+    @keyframes pulse { 0%,100%{transform:scale(1);opacity:.3} 50%{transform:scale(1.12);opacity:.45} }
+
+    .login-card {
+      background:rgba(241,245,250,0.92); backdrop-filter:blur(28px);
+      border:1px solid rgba(99,102,241,0.15); border-radius:2rem;
+      box-shadow:0 24px 64px rgba(99,102,241,0.18), 0 2px 12px rgba(15,23,42,0.06);
+      width:100%; max-width:420px; padding:2.75rem 2.5rem;
+      position:relative; overflow:hidden;
+    }
+    .login-card::before {
+      content:''; position:absolute; top:0; left:0; right:0; height:2px;
+      background:linear-gradient(90deg,transparent,#818cf8 40%,#c084fc 60%,transparent);
+    }
+    .logo-wrap {
+      width:80px; height:80px; margin:0 auto 1.75rem;
+      background:linear-gradient(135deg,#3b4fd8,#7c3aed);
+      border-radius:1.5rem; display:flex; align-items:center; justify-content:center;
+      box-shadow:0 12px 32px rgba(99,102,241,0.45), 0 0 0 1px rgba(255,255,255,0.1);
+      position:relative;
+    }
+    .logo-wrap::after {
+      content:''; position:absolute; inset:-1px; border-radius:1.5rem;
+      background:linear-gradient(135deg,rgba(255,255,255,0.15),transparent);
+    }
+    .field-label { font-size:.72rem; font-weight:700; color:#4f46e5; letter-spacing:.08em; text-transform:uppercase; margin-bottom:.5rem; display:flex; align-items:center; gap:.4rem; }
+    .input-wrap { position:relative; }
+    .input-icon { position:absolute; left:1rem; top:50%; transform:translateY(-50%); color:rgba(129,140,248,.65); font-size:.9rem; pointer-events:none; }
+    .input-icon-right { position:absolute; right:.9rem; top:50%; transform:translateY(-50%); cursor:pointer; color:rgba(156,163,175,.6); font-size:.85rem; transition:color .2s; }
+    .input-icon-right:hover { color:#a5b4fc; }
+    .ft-input {
+      width:100%; background:rgba(15,23,42,.03); color:#1e293b;
+      border:1.5px solid rgba(15,23,42,.14); padding:.78rem 2.8rem;
+      border-radius:.875rem; font-size:.9rem; font-family:inherit;
+      outline:none; transition:all .25s;
+    }
+    .ft-input:focus { border-color:rgba(129,140,248,.75); background:#fff; box-shadow:0 0 0 3px rgba(129,140,248,.18); }
+    .ft-input.error-border { border-color:rgba(239,68,68,.65); box-shadow:0 0 0 3px rgba(239,68,68,.12); }
+    .ft-input::placeholder { color:#9ca3af; font-size:.85rem; }
+    .err-box { background:rgba(239,68,68,.12); border:1px solid rgba(239,68,68,.3); border-radius:.75rem; padding:.6rem .9rem; font-size:.82rem; color:#fca5a5; display:flex; align-items:center; gap:.5rem; margin-bottom:.85rem; }
+    .btn-login {
+      width:100%; padding:.9rem; border-radius:.9rem; border:none; cursor:pointer;
+      background:linear-gradient(to right,#4f46e5,#7c3aed); color:#fff;
+      font-size:.95rem; font-weight:700; font-family:inherit;
+      box-shadow:0 8px 24px rgba(79,70,229,.45); transition:all .25s;
+      display:flex; align-items:center; justify-content:center; gap:.6rem;
+    }
+    .btn-login:hover:not(:disabled) { transform:translateY(-2px); box-shadow:0 12px 32px rgba(79,70,229,.55); }
+    .btn-login:disabled { opacity:.55; cursor:not-allowed; transform:none; }
+    .role-chip { display:inline-flex; align-items:center; gap:.5rem; padding:.4rem .85rem; border-radius:999px; font-size:.78rem; font-weight:600; margin-top:.55rem; }
+    .role-admin { background:rgba(6,182,212,.15); border:1px solid rgba(6,182,212,.35); color:#67e8f9; }
+    .role-user  { background:rgba(129,140,248,.15); border:1px solid rgba(129,140,248,.35); color:#a5b4fc; }
+    .version { font-size:.68rem; color:#94a3b8; text-align:center; margin-top:1.5rem; }
+    @keyframes fadeUp { from{opacity:0;transform:translateY(18px)} to{opacity:1;transform:translateY(0)} }
+    .animate-in { animation:fadeUp .45s cubic-bezier(.4,0,.2,1) both; }
+    .fade-enter-active,.fade-leave-active { transition:all .2s; }
+    .fade-enter-from,.fade-leave-to { opacity:0; transform:translateY(-6px); }
+  </style>
+</head>
+<body>
+  <div class="glow glow-1"></div>
+  <div class="glow glow-2"></div>
+
+  <div id="app" v-cloak>
+    <div class="login-card animate-in">
+
+      <!-- Logo -->
+      <div class="logo-wrap">
+        <i class="fas fa-briefcase text-white" style="font-size:2rem;position:relative;z-index:1;"></i>
+      </div>
+
+      <h1 class="text-2xl font-bold text-center mb-1 tracking-wide" style="color:#1e293b">工作管理系統</h1>
+      <p class="text-sm text-center mb-7" style="color:#64748b">Work Management System</p>
+
+      <!-- 錯誤訊息 -->
+      <transition name="fade">
+        <div v-if="errMsg" class="err-box">
+          <i class="fas fa-circle-exclamation flex-shrink-0"></i>{{ errMsg }}
+        </div>
+      </transition>
+
+      <!-- 帳號 -->
+      <div class="mb-4">
+        <div class="field-label"><i class="fas fa-id-badge"></i>帳號<span class="text-red-400 ml-0.5">*</span></div>
+        <div class="input-wrap">
+          <i class="input-icon fas fa-user"></i>
+          <input type="text" v-model.trim="account" @input="onAccountInput"
+            @keyup.enter="$refs.pwdInput.focus()"
+            class="ft-input" :class="{ 'error-border': errField==='account' }"
+            placeholder="請輸入帳號" autocomplete="username" ref="accInput">
+        </div>
+      </div>
+
+      <!-- 密碼 -->
+      <div class="mb-7">
+        <div class="field-label"><i class="fas fa-lock"></i>密碼<span class="text-red-400 ml-0.5">*</span></div>
+        <div class="input-wrap">
+          <i class="input-icon fas fa-key"></i>
+          <input :type="showPwd ? 'text' : 'password'" v-model="password"
+            @keyup.enter="doLogin"
+            class="ft-input" :class="{ 'error-border': errField==='password' }"
+            placeholder="請輸入密碼" autocomplete="current-password" ref="pwdInput">
+          <i class="input-icon-right"
+             :class="showPwd ? 'fas fa-eye-slash' : 'fas fa-eye'"
+             @click="showPwd = !showPwd"
+             :title="showPwd ? '隱藏密碼' : '顯示密碼'"></i>
+        </div>
+      </div>
+
+      <!-- 登入按鈕 -->
+      <button @click="doLogin" :disabled="logging" class="btn-login">
+        <i v-if="logging" class="fas fa-spinner fa-spin"></i>
+        <i v-else class="fas fa-right-to-bracket"></i>
+        {{ logging ? '驗證中...' : '登　入' }}
+      </button>
+
+      <p class="version">工作管理系統 v1.0 · 僅限授權人員使用</p>
+    </div>
+  </div>
+
+  <script src="static/js/login.js"></script>
+</body>
+</html>
