@@ -91,7 +91,7 @@
     body.light .fp-clear-btn { border-color: rgba(239,68,68,0.3); background: rgba(239,68,68,0.07); }
 
     .tag-overdue { color: #f87171; font-weight: 600; }
-    .tag-today   { color: #34d399; font-weight: 600; }
+    .tag-today   { color: #d33434; font-weight: 600; }
     .tag-ok      { color: #94a3b8; }
 
     .modal-fade-enter-active, .modal-fade-leave-active { transition: opacity 0.25s; }
@@ -352,7 +352,7 @@
             <td class="py-2.5 px-3 whitespace-nowrap"
                 :class="row['距今']?.includes('逾期') ? 'text-red-400 font-medium' : 'text-gray-200'">
               {{ row['項目Due Date'] || '—' }}</td>
-            <td class="py-2.5 px-3 whitespace-nowrap font-medium" :class="dueClass(row['距今'])">{{ row['距今'] || '—' }}</td>
+            <td class="py-2.5 px-3 whitespace-nowrap font-medium" :class="dueClass(row['距今'])">{{ row['狀態']==='Done' ? '' : (row['距今'] || '—') }}</td>
             <td class="py-2.5 px-3 text-gray-200 whitespace-nowrap">{{ row['項目OWNER'] || '—' }}</td>
             <td class="py-2.5 px-3 text-gray-200 whitespace-nowrap">{{ row['單項目Due Date'] || '—' }}</td>
             <td class="py-2.5 px-3 text-gray-100 max-w-[150px] truncate" :title="row['當前最新進度']">{{ row['當前最新進度'] || '—' }}</td>
@@ -360,7 +360,7 @@
               <span class="px-2 py-0.5 rounded-full text-xs font-semibold"
                 :class="{
                   'bg-green-500/20 text-green-300 border border-green-500/30': row['狀態']==='Done',
-                  'bg-blue-500/20 text-blue-300 border border-blue-500/30': row['狀態']==='On Going',
+                  'bg-rose-500/20 text-rose-300 border border-rose-500/30': row['狀態']==='On Going',
                   'bg-gray-500/20 text-gray-300 border border-gray-500/30': !row['狀態'] || row['狀態']==='Pending'
                 }">{{ row['狀態'] || 'Pending' }}</span>
             </td>

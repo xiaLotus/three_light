@@ -73,7 +73,7 @@
     body.light .fp-footer{border-color:rgba(0,0,0,.08)}
     body.light .fp-clear-btn{border-color:rgba(239,68,68,.3);background:rgba(239,68,68,.07)}
     .tag-overdue{color:#f87171;font-weight:600}
-    .tag-today{color:#34d399;font-weight:600}
+    .tag-today{color:#d33434;font-weight:600}
     .tag-ok{color:#94a3b8}
     .input-focus{outline:none;background:rgba(255,255,255,.08);color:#fff;border:1px solid rgba(255,255,255,.2);padding:.6rem .9rem;border-radius:.75rem;transition:all .2s;width:100%;font-size:.875rem;font-family:inherit}
     .input-focus:focus{border-color:rgba(129,140,248,.7);box-shadow:0 0 0 3px rgba(129,140,248,.18);background:rgba(255,255,255,.12)}
@@ -191,7 +191,7 @@
     </div>
     <div class="stat-card flex items-center gap-3">
       <div class="w-9 h-9 rounded-lg bg-red-500/20 flex items-center justify-center"><i class="fas fa-triangle-exclamation text-red-400 text-sm"></i></div>
-      <div><div class="text-xl font-bold text-red-400">{{ filteredData.filter(i=>!i['距今']?.startsWith('剩')&&i['距今']!=='今日'&&i['距今']&&i['距今']!=='無').length }}</div><div class="text-gray-400 text-xs">逾期任務</div></div>
+      <div><div class="text-xl font-bold text-red-400">{{ filteredData.filter(i=>i['狀態']!=='Done'&&!i['距今']?.startsWith('剩')&&i['距今']!=='今日'&&i['距今']&&i['距今']!=='無').length }}</div><div class="text-gray-400 text-xs">逾期任務</div></div>
     </div>
     <div class="stat-card flex items-center gap-3">
       <div class="w-9 h-9 rounded-lg bg-green-500/20 flex items-center justify-center"><i class="fas fa-clock text-green-400 text-sm"></i></div>
@@ -239,7 +239,7 @@
             <td class="py-2.5 px-3 text-gray-200">{{ row['案件分類']||'—' }}</td>
             <td class="py-2.5 px-3 text-gray-100 max-w-[180px] truncate" :title="row['項目描述']">{{ row['項目描述']||'—' }}</td>
             <td class="py-2.5 px-3 whitespace-nowrap" :class="dueClass(row['距今'])">{{ row['項目Due Date']||'—' }}</td>
-            <td class="py-2.5 px-3 whitespace-nowrap font-medium" :class="dueClass(row['距今'])">{{ row['距今']||'—' }}</td>
+            <td class="py-2.5 px-3 whitespace-nowrap font-medium" :class="dueClass(row['距今'])">{{ row['狀態']==='Done' ? '' : (row['距今']||'—') }}</td>
             <td class="py-2.5 px-3 text-gray-300 max-w-[160px] truncate" :title="row['當前最新進度']">{{ row['當前最新進度']||'—' }}</td>
             <td class="py-2.5 px-3 whitespace-nowrap">
               <span class="px-2 py-0.5 rounded-full text-xs font-semibold"

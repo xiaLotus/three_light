@@ -44,6 +44,15 @@ Vue.createApp({
 
             toasts:  [],
             toastId: 0,
+
+            // 節點編輯
+            editingNodeId:   null,
+            editingNodeText: '',
+            nodeSubmitting:  false,
+
+            // 節點刪除確認
+            showDelNode:  false,
+            delNodeTarget: null,
         }
     },
 
@@ -56,6 +65,14 @@ Vue.createApp({
             if (!this.task) return false
             const p = this.task['提案人'] || ''
             return p === this.userName || p === this.account || this.isOrgAdmin
+        },
+        // 節點可修改/刪除：提案人、項目OWNER、該組織管理員
+        canEditNode() {
+            if (!this.task) return false
+            const proposer = this.task['提案人'] || ''
+            const owner    = this.task['項目OWNER'] || ''
+            const matchName = (field) => field === this.userName || field === this.account
+            return matchName(proposer) || matchName(owner) || this.isOrgAdmin
         },
         currentLevelNodes() {
             const nodes = this.currentPath.length === 0
@@ -141,6 +158,7 @@ Vue.createApp({
                 })
                 this.progressTree = res.data.tree || []
                 this._resyncPath()
+                if (this.task) this.task['當前最新進度'] = res.data.latest || this.newProgress.trim()
                 this.newProgress = ''
                 this.toast('✅ 節點已新增', 'success')
             } catch { this.toast('❌ 新增失敗', 'error') }
@@ -163,6 +181,48 @@ Vue.createApp({
                 else break
             }
             this.currentPath = newPath
+        },
+
+        // ── 節點編輯 ──
+        startEditNode(node) {
+            this.editingNodeId   = node.id
+            this.editingNodeText = node.text
+        },
+        cancelEditNode() {
+            this.editingNodeId   = null
+            this.editingNodeText = ''
+        },
+        async submitEditNode(node) {
+            if (!this.editingNodeText.trim()) return
+            this.nodeSubmitting = true
+            try {
+                const res = await axios.post(`${API}/api/progress/${this.taskId}/node/${node.id}`, {
+                    text: this.editingNodeText.trim()
+                })
+                this.progressTree = res.data.tree || []
+                this._resyncPath()
+                // 同步更新前端顯示的當前最新進度
+                if (this.task) this.task['當前最新進度'] = res.data.latest || this.editingNodeText.trim()
+                this.cancelEditNode()
+                this.toast('✅ 節點已更新', 'success')
+            } catch { this.toast('❌ 更新失敗', 'error') }
+            finally { this.nodeSubmitting = false }
+        },
+
+        // ── 節點刪除 ──
+        confirmDelNode(node) { this.delNodeTarget = node; this.showDelNode = true },
+        cancelDelNode()      { this.delNodeTarget = null; this.showDelNode = false },
+        async doDelNode() {
+            if (!this.delNodeTarget) return
+            try {
+                const res = await axios.delete(`${API}/api/progress/${this.taskId}/node/${this.delNodeTarget.id}`)
+                this.progressTree = res.data.tree || []
+                this._resyncPath()
+                // 同步更新前端顯示的當前最新進度
+                if (this.task) this.task['當前最新進度'] = res.data.latest || ''
+                this.toast('✅ 節點已刪除', 'success')
+            } catch { this.toast('❌ 刪除失敗', 'error') }
+            finally { this.cancelDelNode() }
         },
 
         toast(msg, type='success') {

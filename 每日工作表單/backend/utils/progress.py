@@ -54,7 +54,7 @@ def latest_progress(id_):
 def new_node(text):
     return {
         'id':       str(uuid.uuid4()),
-        'time':     datetime.now().strftime('%Y-%m-%d %H:%M'),
+        'time':     datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
         'text':     text,
         'children': []
     }

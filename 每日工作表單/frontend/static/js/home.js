@@ -54,9 +54,10 @@ const app = Vue.createApp({
         : this.today.filter(i => this.selectedOrg.includes(i['組織類別']))
     },
     dueList() {
-      const list = this.selectedOrg.length === 0
+      const list = (this.selectedOrg.length === 0
         ? this.due
         : this.due.filter(i => this.selectedOrg.includes(i['組織類別']))
+      ).filter(i => i['狀態'] !== 'Done')
       // 距今天數（逾期為負、今日為0、剩N天為正）→ 從近到遠排；同距今則按日期升冪
       const days = v => {
         if (!v || v === '無') return 9999

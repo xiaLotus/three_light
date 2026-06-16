@@ -50,10 +50,12 @@ const app = Vue.createApp({
     computed: {
         baseRows() {
             if (!this.personFilter) return this.rows
-            // 同時比對姓名與帳號（相容舊資料）
+            // 同時比對提案人、帳號、管理OWNER（相容舊資料）
             return this.rows.filter(i => {
                 const p = i['提案人'] || ''
+                const o = i['管理OWNER'] || ''
                 return p.includes(this.personFilter) || (this.account && p.includes(this.account))
+                    || o.includes(this.personFilter) || (this.account && o.includes(this.account))
             })
         },
         hasAnyFilter() {
